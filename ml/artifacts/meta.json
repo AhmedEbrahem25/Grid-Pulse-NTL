@@ -1,0 +1,21 @@
+{
+  "features": [
+    "load_w",
+    "temp_c",
+    "hour",
+    "dow",
+    "voltage_v",
+    "current_a",
+    "rated_kva"
+  ],
+  "n": 8000,
+  "importances": {
+    "load_w": 0.578,
+    "temp_c": 0.27,
+    "hour": 0.002,
+    "dow": 0.001,
+    "voltage_v": 0.001,
+    "current_a": 0.148,
+    "rated_kva": 0.001
+  }
+}

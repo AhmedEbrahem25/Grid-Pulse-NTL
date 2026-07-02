@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Grid-Pulse NTL — Theft Watch</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --bg:#0a0b0e; --panel:#111318; --panel2:#161922; --border:#232733;
+    --text:#e7ebf0; --muted:#8a93a3; --accent:#38bdf8;
+    --ok:#34d399; --warn:#f59e0b; --bad:#fb3b57;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:grid; grid-template-rows:auto 1fr; height:100dvh; overflow:hidden;
+  }
+  .mono{font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+  header{
+    display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.01em}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 var(--ok)}
+  .live .dot{animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 8px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+  .brand small{color:var(--muted);font-weight:450}
+  .kpis{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .kpi{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:6px 12px;min-width:92px}
+  .kpi b{display:block;font-size:19px;letter-spacing:-.02em}
+  .kpi span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  main{display:grid;grid-template-columns:312px 1fr 360px;min-height:0}
+  .col{min-height:0;overflow:auto;padding:16px}
+  .col.mid{padding:0;display:grid;grid-template-rows:1fr auto}
+  .mapwrap{position:relative;min-height:0}
+  #map{width:100%;height:100%;background:#0d1017}
+  .maptag{position:absolute;top:12px;right:12px;z-index:500;background:rgba(13,16,23,.82);border:1px solid var(--border);
+    border-radius:10px;padding:7px 11px;font-size:11px;color:var(--muted);letter-spacing:.02em;backdrop-filter:blur(4px)}
+  .maptag b{color:var(--text);font-weight:600;letter-spacing:-.01em}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px}
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}
+  h2 .cnt{color:var(--muted);font-weight:500;letter-spacing:0}
+  .txlist{display:flex;flex-direction:column;gap:6px}
+  .tx{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border);
+    border-radius:10px;cursor:pointer;background:var(--panel);transition:border-color .15s,background .15s}
+  .tx:hover{border-color:#33405a}
+  .tx[aria-selected="true"]{border-color:var(--accent);background:#12202b}
+  .tx .s{width:9px;height:9px;border-radius:50%;flex:none;position:relative}
+  .tx .s.warn,.tx .s.bad{box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+  .tx .txmain{min-width:0}
+  .tx .n{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tx .f{font-size:11px;color:var(--muted)}
+  .tx .txright{text-align:right;flex:none}
+  .tx .chip{font-size:10.5px;font-weight:650;padding:2px 8px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
+  .tx .txmetric{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .chip.ok{background:rgba(52,211,153,.14);color:var(--ok)}
+  .chip.warn{background:rgba(245,158,11,.14);color:var(--warn)}
+  .chip.bad{background:rgba(251,59,87,.16);color:var(--bad)}
+  .chip.none{background:#1b1f29;color:#5b6576}
+  .s.ok{background:var(--ok)} .s.warn{background:var(--warn)} .s.bad{background:var(--bad)}
+  /* map pins */
+  .pinwrap{background:none;border:none}
+  .pin{position:relative;display:grid;place-items:center;width:100%;height:100%}
+  .pin .core{border-radius:50%;background:var(--ok);border:2px solid #0a0b0e;box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+  .pin.warn .core{background:var(--warn)} .pin.bad .core{background:var(--bad)}
+  .pin .ring{position:absolute;border-radius:50%;border:2px solid transparent}
+  .pin.warn .ring{border-color:var(--warn);animation:ring 2.2s ease-out infinite}
+  .pin.bad .ring{border-color:var(--bad);animation:ring 1.4s ease-out infinite}
+  @keyframes ring{0%{transform:scale(1);opacity:.75}100%{transform:scale(3.4);opacity:0}}
+  .pin.sel .core{box-shadow:0 0 0 3px rgba(56,189,248,.55)}
+  .legend{background:rgba(17,19,24,.9);border:1px solid var(--border);border-radius:10px;padding:8px 11px;
+    font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+  .legend span{display:flex;align-items:center;gap:7px}
+  .legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .demobar{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:var(--panel)}
+  button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:9px 14px;cursor:pointer;transition:transform .08s,border-color .15s}
+  button:hover{border-color:#3a4763}
+  button:active{transform:translateY(1px)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  button.k-normal:hover{border-color:var(--ok)} button.k-technical:hover{border-color:var(--warn)} button.k-theft:hover{border-color:var(--bad)}
+  .btn-accent{background:var(--accent);color:#04141d;border-color:var(--accent);font-weight:600}
+  #verdict{transition:border-color .2s,box-shadow .3s}
+  #verdict.v-ok{border-left:3px solid var(--ok)}
+  #verdict.v-warn{border-left:3px solid var(--warn)}
+  #verdict.v-bad{border-left:3px solid var(--bad);box-shadow:0 0 0 1px rgba(251,59,87,.22),0 14px 46px -22px rgba(251,59,87,.5)}
+  .verdict-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .badge{font-size:11px;font-weight:650;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em}
+  .badge.ok{background:rgba(52,211,153,.14);color:var(--ok)}
+  .badge.warn{background:rgba(245,158,11,.14);color:var(--warn)}
+  .badge.bad{background:rgba(251,59,87,.16);color:var(--bad)}
+  .prob{font-size:52px;font-weight:700;letter-spacing:-.03em;line-height:1;margin:6px 0}
+  .prob small{font-size:15px;color:var(--muted);font-weight:500;letter-spacing:0}
+  .reasons{list-style:none;padding:0;margin:10px 0 0;display:flex;flex-direction:column;gap:7px}
+  .reasons li{display:flex;gap:9px;align-items:flex-start;font-size:13px}
+  .reasons .mk{width:18px;height:18px;border-radius:5px;flex:none;display:grid;place-items:center;font-size:12px;margin-top:1px}
+  .reasons .met .mk{background:rgba(251,59,87,.18);color:var(--bad)}
+  .reasons .no .mk{background:#1b1f29;color:#4b5566}
+  .reasons .rl{font-weight:500}
+  .reasons .rd{color:var(--muted);font-size:11.5px}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+  .metric{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:9px}
+  .metric b{display:block;font-size:17px;letter-spacing:-.02em}
+  .metric.hl b{color:var(--bad)}
+  .metric span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .sparkhead{display:flex;justify-content:space-between;align-items:baseline;margin:14px 0 2px}
+  .sparkhead .lab{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+  .sparkhead .val{font-size:11px}
+  .spark{width:100%;height:56px;display:block}
+  .feed{display:flex;flex-direction:column;gap:8px}
+  .fitem{border:1px solid var(--border);border-left-width:3px;border-radius:8px;padding:8px 10px;background:var(--panel);animation:slidein .25s ease}
+  .fitem.ok{border-left-color:var(--ok)} .fitem.warn{border-left-color:var(--warn)} .fitem.bad{border-left-color:var(--bad)}
+  @keyframes slidein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  .fitem .t{display:flex;justify-content:space-between;font-size:12px;gap:8px}
+  .fitem .m{font-size:11px;color:var(--muted);margin-top:2px}
+  .fitem .ago{color:var(--muted);font-weight:400}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:26px 10px}
+  .row-actions{display:flex;gap:8px;margin-top:14px}
+  a{color:var(--accent)}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:1100px){main{grid-template-columns:1fr}.col.left,.col.right{display:none}}
+</style>
+</head>
+<body>
+<header class="live">
+  <div class="brand"><span class="dot" id="conn"></span> Grid-Pulse&nbsp;NTL <small id="connlabel">· connecting…</small></div>
+  <div class="kpis">
+    <div class="kpi"><b id="k-total">—</b><span>Transformers</span></div>
+    <div class="kpi"><b id="k-clear" style="color:var(--ok)">—</b><span>Feeders clear</span></div>
+    <div class="kpi"><b id="k-threat" style="color:var(--bad)">0</b><span>Under threat</span></div>
+    <div class="kpi"><b id="k-theft" class="mono">0.0</b><span>kW at risk</span></div>
+  </div>
+</header>
+
+<main>
+  <!-- left: transformer list -->
+  <section class="col left">
+    <h2>Transformers <span class="cnt mono" id="tx-count"></span></h2>
+    <div class="txlist" id="txlist"></div>
+  </section>
+
+  <!-- middle: map + demo controls -->
+  <section class="col mid">
+    <div class="mapwrap">
+      <div id="map"></div>
+      <div class="maptag"><b>Kafr El-Sheikh</b> · distribution grid</div>
+    </div>
+    <div class="demobar">
+      <span style="align-self:center;color:var(--muted);font-size:12px">Demo:</span>
+      <button class="k-normal" onclick="fireScenario('normal')">Normal load</button>
+      <button class="k-technical" onclick="fireScenario('technical')">Hot day (technical)</button>
+      <button class="k-theft btn-accent" onclick="fireScenario('theft')">Inject theft</button>
+    </div>
+  </section>
+
+  <!-- right: verdict + reasons + feed -->
+  <section class="col right">
+    <div class="card" id="verdict">
+      <h2>Assessment</h2>
+      <div class="empty" id="verdict-empty">Select a transformer, then run a demo scenario.</div>
+      <div id="verdict-body" hidden>
+        <div class="verdict-head"><span class="badge" id="v-badge"></span><span id="v-name" style="font-size:13px;color:var(--muted)"></span></div>
+        <div class="prob" id="v-prob" hidden><span id="v-prob-n">0</span>%<small> theft probability</small></div>
+        <div id="v-summary" style="font-size:13px;color:var(--muted)"></div>
+        <ul class="reasons" id="v-reasons"></ul>
+        <div class="metrics">
+          <div class="metric"><b class="mono" id="m-measured">—</b><span>Measured loss</span></div>
+          <div class="metric"><b class="mono" id="m-expected">—</b><span>AI baseline</span></div>
+          <div class="metric hl"><b class="mono" id="m-residual">—</b><span>Unaccounted</span></div>
+        </div>
+        <div class="sparkhead"><span class="lab">Measured-loss trend</span><span class="val mono" id="spark-val" style="color:var(--muted)"></span></div>
+        <svg class="spark" id="spark" viewBox="0 0 320 56" preserveAspectRatio="none"></svg>
+        <div class="row-actions" id="v-actions" hidden>
+          <button class="btn-accent" onclick="setStatus('dispatched')">Dispatch inspection</button>
+          <button onclick="setStatus('dismissed')">Dismiss</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Verdict feed</h2>
+      <div class="feed" id="feed"><div class="empty">No events yet.</div></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const API = location.origin;
+const clsFor = l => l==="NTL_THEFT_SUSPECTED" ? "bad" : l==="TECHNICAL_LOSS" ? "warn" : "ok";
+const labelText = l => l==="NTL_THEFT_SUSPECTED" ? "Theft suspected" : l==="TECHNICAL_LOSS" ? "Technical loss" : "Normal";
+const COLOR = {bad:'#fb3b57', warn:'#f59e0b', ok:'#34d399'};
+const kW = w => (w/1000).toFixed(2)+" kW";
+let transformers=[], markers={}, selected=null, latest={}, series={}, lastVerdictId={};
+
+const map = L.map('map',{zoomControl:true,attributionControl:false}).setView([31.111,30.939],13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+const legend=L.control({position:'bottomleft'});
+legend.onAdd=()=>{ const d=L.DomUtil.create('div','legend');
+  d.innerHTML=`<span><i style="background:${COLOR.ok}"></i>Normal</span>
+               <span><i style="background:${COLOR.warn}"></i>Technical loss</span>
+               <span><i style="background:${COLOR.bad}"></i>Theft suspected</span>`;
+  return d; };
+legend.addTo(map);
+
+async function boot(){
+  try{
+    transformers = await (await fetch(API+'/transformers')).json();
+    document.getElementById('k-total').textContent = transformers.length;
+    document.getElementById('tx-count').textContent = transformers.length;
+    renderMarkers();
+    transformers.forEach(t=>{ if(t.latest_verdict){ latest[t.id]=t.latest_verdict; } });
+    renderList();
+    // back-fill the feed + loss trend so the console looks live the moment it opens
+    try{ let vs=await (await fetch(API+'/verdicts')).json();
+         const idn=v=>parseInt(String(v.id).replace(/\D/g,''))||0;   // monotonic order (created_at is second-resolution and ties)
+         vs=vs.slice().sort((a,b)=>idn(a)-idn(b));
+         vs.slice(-10).forEach(v=>pushFeed(v));
+         vs.forEach(v=>trackLoss(v)); }catch(e){}
+    transformers.forEach(t=>{ if(latest[t.id]) refreshTransformer(latest[t.id]); });
+    recountKPIs();
+    if(transformers[0]) select(transformers[0].id);
+  }catch(e){ console.error(e); }
+  connectWS();
+}
+
+/* ---------- transformer list ---------- */
+function rowHtml(t){
+  const v=latest[t.id]; const c=v?clsFor(v.label):'none';
+  const chip = v ? (v.label==="NTL_THEFT_SUSPECTED"?`${v.theft_probability}%`:labelText(v.label)) : 'no data';
+  const metric = v ? `loss ${kW(v.measured_loss_w)}` : `${t.rated_kva} kVA`;
+  return `<span class="s ${c==='none'?'ok':c}"></span>
+    <div class="txmain"><div class="n">${t.name}</div><div class="f mono">${t.id} · ${t.rated_kva} kVA</div></div>
+    <div class="txright"><span class="chip ${c}">${chip}</span><div class="txmetric mono">${metric}</div></div>`;
+}
+function renderList(){
+  const el=document.getElementById('txlist'); el.innerHTML='';
+  transformers.forEach(t=>{
+    const d=document.createElement('div'); d.className='tx'; d.id='tx-'+t.id;
+    d.setAttribute('role','button'); d.setAttribute('aria-selected', selected===t.id);
+    d.onclick=()=>select(t.id);
+    d.innerHTML=rowHtml(t);
+    el.appendChild(d);
+  });
+}
+function updateRow(id){ const row=document.getElementById('tx-'+id); const t=transformers.find(x=>x.id===id);
+  if(row&&t){ row.innerHTML=rowHtml(t); } }
+
+/* ---------- map markers ---------- */
+function iconFor(t){
+  const v=latest[t.id]; const c=v?clsFor(v.label):'ok';
+  const px=Math.round(12+(t.rated_kva||400)/95);   // size by rated kVA
+  const sel=selected===t.id;
+  const html=`<div class="pin ${c}${sel?' sel':''}">
+      <span class="ring" style="width:${px}px;height:${px}px"></span>
+      <span class="core" style="width:${px}px;height:${px}px"></span></div>`;
+  return L.divIcon({className:'pinwrap',html,iconSize:[px+6,px+6],iconAnchor:[(px+6)/2,(px+6)/2]});
+}
+function renderMarkers(){
+  transformers.forEach(t=>{
+    if(t.lat==null) return;
+    const m=L.marker([t.lat,t.lng],{icon:iconFor(t),keyboard:false});
+    m.on('click',()=>select(t.id)); m.addTo(map); markers[t.id]=m;
+  });
+}
+function updateMarkers(){ transformers.forEach(t=>{ if(markers[t.id]) markers[t.id].setIcon(iconFor(t)); }); }
+
+/* ---------- selection ---------- */
+function select(id){
+  selected=id;
+  document.querySelectorAll('.tx').forEach(x=>x.setAttribute('aria-selected', x.id==='tx-'+id));
+  updateMarkers();
+  const t=transformers.find(x=>x.id===id);
+  if(t&&t.lat!=null) map.panTo([t.lat,t.lng]);
+  if(latest[id]) showVerdict(latest[id]); else clearVerdict(t);
+  drawSpark();
+}
+function clearVerdict(t){
+  document.getElementById('verdict').className='card';
+  document.getElementById('verdict-empty').hidden=false;
+  document.getElementById('verdict-body').hidden=true;
+}
+
+/* ---------- verdict handling ---------- */
+function refreshTransformer(v){        // update list row + marker for one transformer
+  latest[v.transformer_id]=v;
+  updateRow(v.transformer_id);
+  if(markers[v.transformer_id]) markers[v.transformer_id].setIcon(iconFor(transformers.find(t=>t.id===v.transformer_id)));
+}
+function recountKPIs(){
+  const vals=Object.values(latest);
+  const threats=vals.filter(x=>x.label==="NTL_THEFT_SUSPECTED");
+  const clear=vals.filter(x=>x.label==="NORMAL").length;
+  document.getElementById('k-clear').textContent=clear;
+  document.getElementById('k-threat').textContent=threats.length;
+  document.getElementById('k-theft').textContent=(threats.reduce((s,x)=>s+(x.theft_estimate_w||0),0)/1000).toFixed(1);
+}
+function applyVerdict(v,animate){
+  refreshTransformer(v);
+  trackLoss(v);
+  recountKPIs();
+  if(animate) pushFeed(v);
+  if(selected===v.transformer_id){ showVerdict(v); drawSpark(); }
+}
+
+function showVerdict(v){
+  lastVerdictId[v.transformer_id]=v.id;
+  const c=clsFor(v.label);
+  document.getElementById('verdict').className='card v-'+c;
+  document.getElementById('verdict-empty').hidden=true;
+  document.getElementById('verdict-body').hidden=false;
+  const badge=document.getElementById('v-badge'); badge.className='badge '+c; badge.textContent=labelText(v.label);
+  document.getElementById('v-name').textContent=v.transformer_id+' · '+v.phase;
+  const probEl=document.getElementById('v-prob');
+  if(v.label==="NTL_THEFT_SUSPECTED"){ probEl.hidden=false; probEl.style.color='var(--bad)'; animateNum('v-prob-n', v.theft_probability||0); }
+  else probEl.hidden=true;
+  document.getElementById('v-summary').textContent=(v.explanation&&v.explanation.summary)||'';
+  const ul=document.getElementById('v-reasons'); ul.innerHTML='';
+  (v.reasons||[]).forEach(r=>{
+    const li=document.createElement('li'); li.className=r.met?'met':'no';
+    li.innerHTML=`<span class="mk">${r.met?'✓':'○'}</span><span><span class="rl">${r.label}</span> &nbsp;<span class="rd mono">${r.detail}</span></span>`;
+    ul.appendChild(li);
+  });
+  document.getElementById('m-measured').textContent=kW(v.measured_loss_w);
+  document.getElementById('m-expected').textContent=kW(v.tech_loss_expected_w);
+  document.getElementById('m-residual').textContent=kW(v.residual_w);
+  document.getElementById('v-actions').hidden = v.label!=="NTL_THEFT_SUSPECTED";
+}
+function animateNum(id,to){ const el=document.getElementById(id); let n=0; const step=Math.max(1,Math.round(to/18));
+  clearInterval(el._t); el._t=setInterval(()=>{ n=Math.min(to,n+step); el.textContent=n; if(n>=to)clearInterval(el._t); },20); }
+
+/* ---------- feed ---------- */
+function pushFeed(v){
+  const feed=document.getElementById('feed'); if(feed.querySelector('.empty')) feed.innerHTML='';
+  const c=clsFor(v.label);
+  const it=document.createElement('div'); it.className='fitem '+c;
+  const extra=v.label==="NTL_THEFT_SUSPECTED"?` · ${v.theft_probability}%`:'';
+  it.innerHTML=`<div class="t"><b>${labelText(v.label)}${extra}</b><span class="mono ago">${v.transformer_id}</span></div>
+                <div class="m">${(v.explanation&&v.explanation.summary)||''}</div>`;
+  feed.prepend(it); while(feed.children.length>18) feed.lastChild.remove();
+}
+
+/* ---------- loss-trend sparkline ---------- */
+function trackLoss(v){ const a=series[v.transformer_id]=series[v.transformer_id]||[]; a.push(v.measured_loss_w); if(a.length>40)a.shift(); }
+function pushReading(r){ const a=series[r.transformer_id]=series[r.transformer_id]||[]; a.push(r.p_active_w); if(a.length>40)a.shift(); if(selected===r.transformer_id) drawSpark(); }
+function drawSpark(){
+  const s=series[selected]||[]; const svg=document.getElementById('spark'); const valEl=document.getElementById('spark-val');
+  if(!svg) return;
+  if(s.length<2){ svg.innerHTML=''; if(valEl) valEl.textContent=''; return; }
+  const w=320,h=56, mn=Math.min(...s), mx=Math.max(...s), rng=(mx-mn)||1;
+  const X=i=>(i/(s.length-1))*w, Y=v=>h-6-((v-mn)/rng)*(h-14);
+  const pts=s.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`);
+  const v=latest[selected]; const col=v?COLOR[clsFor(v.label)]:'#38bdf8';
+  const line='M'+pts.join(' L');
+  const area=line+` L${w},${h} L0,${h} Z`;
+  const lx=X(s.length-1).toFixed(1), ly=Y(s[s.length-1]).toFixed(1);
+  svg.innerHTML=`<defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="${col}" stop-opacity=".30"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${area}" fill="url(#sg)"/>
+    <path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${lx}" cy="${ly}" r="3.2" fill="${col}"/>`;
+  if(valEl){ valEl.textContent=`${(s[s.length-1]/1000).toFixed(2)} kW`; valEl.style.color=col; }
+}
+
+/* ---------- actions ---------- */
+async function fireScenario(scn){
+  if(!selected) return;
+  try{ await fetch(API+'/sim/scenario',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({transformer_id:selected,scenario:scn})}); }catch(e){ console.error(e); }
+}
+async function setStatus(st){
+  const vid=lastVerdictId[selected]; if(!vid) return;
+  try{ await fetch(API+`/verdicts/${vid}/status`,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({status:st})}); }catch(e){}
+}
+
+/* ---------- transport ---------- */
+let ws, pollTimer;
+function connectWS(){
+  try{
+    ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws/stream');
+    ws.onopen=()=>{ setConn(true); clearInterval(pollTimer); };
+    ws.onclose=()=>{ setConn(false); startPolling(); setTimeout(connectWS,3000); };
+    ws.onmessage=e=>{ const {type,payload}=JSON.parse(e.data);
+      if(type==='verdict') applyVerdict(payload,true);
+      else if(type==='edge_reading') pushReading(payload);
+    };
+  }catch(e){ setConn(false); startPolling(); }
+}
+function setConn(ok){ document.getElementById('conn').style.background=ok?'var(--ok)':'var(--warn)';
+  document.getElementById('connlabel').textContent=ok?'· live':'· polling'; }
+function startPolling(){ clearInterval(pollTimer); pollTimer=setInterval(async()=>{
+  try{ const vs=await (await fetch(API+'/verdicts')).json(); if(vs[0]) applyVerdict(vs[0],false);}catch(e){} },3000); }
+
+boot();
+</script>
+</body>
+</html>

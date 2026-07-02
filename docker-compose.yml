@@ -1,0 +1,40 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports: ["8000:8000"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      INGEST_TOKEN: ${INGEST_TOKEN:-dev-token}
+      # INLINE_DETECTION=true  → the API runs detection itself (simplest; great for the demo).
+      # INLINE_DETECTION=false → the API enqueues to Celery; the worker below does detection.
+      INLINE_DETECTION: ${INLINE_DETECTION:-true}
+    volumes:
+      - ./backend:/app
+      - ./ml/artifacts:/app/artifacts
+      - ./dashboard:/app/dashboard
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: celery -A app.queue.celery_app worker --loglevel=info
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      INGEST_TOKEN: ${INGEST_TOKEN:-dev-token}
+    volumes:
+      - ./backend:/app
+      - ./ml/artifacts:/app/artifacts
+    depends_on:
+      redis:
+        condition: service_healthy

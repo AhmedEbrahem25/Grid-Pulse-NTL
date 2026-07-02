@@ -1,0 +1,306 @@
+<title>Grid-Pulse NTL — Field Deployment</title>
+<style>
+  :root{
+    --ink:#0a0e0f; --ink2:#10161a; --panel:#0e1418; --line:#1e2a2f; --line2:#2a3a41;
+    --fg:#e8eef0; --muted:#8a9ba1; --dim:#5f7178;
+    --signal:#34c8e0; --signal-dim:#1c6a74;
+    --theft:#ff4d5e; --tech:#f4a63b; --ok:#3ddc84; --copper:#e08a4a;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--fg);font-family:var(--sans);line-height:1.55;font-size:16px;
+    background-image:radial-gradient(120% 80% at 50% -10%, #101a1d 0%, var(--ink) 55%);}
+  ::selection{background:var(--signal);color:#04191c}
+  a{color:var(--signal);text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 26px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  h1,h2,h3,h4{margin:0;letter-spacing:-.02em;text-wrap:balance;font-weight:720;line-height:1.06}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--signal)}
+  section{border-top:1px solid var(--line)}
+  .pad{padding:70px 0}
+  .shead{display:flex;gap:15px;align-items:baseline;margin-bottom:32px}
+  .snum{font-family:var(--mono);font-size:13px;color:var(--signal-dim)}
+  h2{font-size:clamp(24px,3.3vw,34px)}
+  .kicker{color:var(--muted);max-width:66ch;margin:14px 0 0}
+
+  header .hero{padding:88px 0 40px}
+  h1{font-size:clamp(32px,5.4vw,58px)}
+  h1 em{font-style:normal;color:var(--signal)}
+  .sub{max-width:64ch;margin:20px 0 0;font-size:18px;color:#c3d0d4}
+
+  /* diagram */
+  .diagram{margin-top:34px;background:linear-gradient(180deg,#0c1418,#0a1013);border:1px solid var(--line2);
+    border-radius:16px;padding:20px;box-shadow:0 40px 90px -50px #000}
+  .diagram svg{width:100%;height:auto;display:block}
+  .dlegend{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--muted);justify-content:center}
+  .dlegend span{display:flex;align-items:center;gap:7px}
+  .dlegend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+  .chambers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .cham{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px;position:relative;overflow:hidden}
+  .cham .strip{position:absolute;left:0;top:0;bottom:0;width:3px}
+  .cham .z{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+  .cham h3{font-size:18px;margin:8px 0 6px}
+  .cham p{font-size:13.5px;color:var(--muted);margin:0}
+  .cham.no .z{color:var(--theft)} .cham.mid .z{color:var(--tech)} .cham.our .z{color:var(--signal)}
+  .cham.our{border-color:#25505a;box-shadow:inset 0 0 0 1px rgba(52,200,224,.12)}
+
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .cc{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .cc .pic{background:linear-gradient(180deg,#0c1418,#0a1013);border-bottom:1px solid var(--line);padding:20px;display:grid;place-items:center}
+  .cc .pic svg{width:100%;height:130px}
+  .cc .body{padding:20px}
+  .cc .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
+  .cc.poc .tag{color:var(--muted)} .cc.prod .tag{color:var(--signal)}
+  .cc h3{font-size:19px;margin-bottom:4px}
+  .cc .body>p{font-size:13.5px;color:var(--muted);margin:6px 0 14px}
+  .cc ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+  .cc li{font-size:13px;color:#c6d1d5;display:flex;gap:9px}
+  .cc li::before{content:"›";color:var(--signal-dim);font-family:var(--mono)}
+  .cc .body{display:flex;flex-direction:column;flex:1}
+  .cc .verdict{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim)}
+
+  .flow{display:flex;flex-direction:column;gap:0}
+  .step{display:grid;grid-template-columns:56px 1fr;gap:20px;padding:20px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:0}
+  .step .n{font-family:var(--mono);font-size:22px;color:var(--signal);font-weight:600}
+  .step h3{font-size:17px;margin-bottom:5px}
+  .step p{font-size:14px;color:var(--muted);margin:0;max-width:74ch}
+  .step .tag{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:6px;
+    border:1px solid var(--line2);color:var(--muted)}
+  .step .tag.safe{color:var(--ok);border-color:#1f5a3f}
+  .step .tag.live{color:var(--tech);border-color:#5a4a1f}
+
+  .safety{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:center}
+  .safebox{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:13px;padding:22px}
+  .safebox h3{font-size:17px;margin-bottom:12px}
+  .safebox ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+  .safebox li{font-size:14px;color:#c3d0d4;display:flex;gap:10px}
+  .safebox li b{color:var(--ok)}
+  .safebox li::before{content:"✓";color:var(--ok);font-family:var(--mono)}
+  .why{font-size:15px;color:#c3d0d4}
+  .why b{color:var(--fg)}
+
+  .links{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+  .links a{border:1px solid var(--line2);border-radius:10px;padding:10px 16px;font-size:13px;color:#cdd8db;display:flex;gap:8px;align-items:center}
+  .links a:hover{border-color:var(--signal-dim)}
+  .foot{border-top:1px solid var(--line);padding:26px 0;color:var(--dim);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .note{font-size:12.5px;color:var(--dim);border-left:2px solid var(--line2);padding-left:13px;margin-top:16px;max-width:80ch}
+  @media (max-width:860px){.chambers,.cmp,.safety{grid-template-columns:1fr}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+
+<header><div class="wrap hero">
+  <div class="eyebrow">Grid-Pulse NTL · Field Deployment</div>
+  <h1 style="margin-top:20px">From the bench clamp<br>to the <em>busbar</em>.</h1>
+  <p class="sub">The target in the field is a sealed distribution kiosk (RMU) — an iron box carrying thousands of amps. We don't bolt anything to its shell: we retrofit it from the inside, non-invasively, on the low-voltage side only. No cables cut, no outage, no one near the 11 kV.</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 940 440" role="img" aria-label="Cross-section of a distribution kiosk: MV chamber (no-go), transformer, and LV panel where Rogowski coils wrap the busbars and feed an IP65 edge node with an external antenna">
+      <!-- ground -->
+      <rect x="0" y="392" width="940" height="48" fill="#0c1216"/>
+      <g stroke="#1a242a" stroke-width="1">
+        <line x1="0" y1="392" x2="940" y2="392"/>
+        <line x1="20" y1="404" x2="40" y2="416"/><line x1="80" y1="404" x2="100" y2="416"/><line x1="140" y1="404" x2="160" y2="416"/>
+      </g>
+      <!-- cloud + link -->
+      <g fill="none" stroke="#34c8e0" stroke-width="1.6">
+        <path d="M812 44 a15 15 0 0 1 4 -29 a19 19 0 0 1 36 4 a13 13 0 0 1 -2 25 z" fill="#0d1519"/>
+      </g>
+      <text x="833" y="38" fill="#8a9ba1" font-size="10" font-family="monospace" text-anchor="middle">Grid-Pulse</text>
+      <g stroke="#34c8e0" stroke-width="1.4" fill="none" opacity=".7">
+        <path d="M792 70 a26 26 0 0 1 0 -20"/><path d="M800 74 a34 34 0 0 1 0 -28"/>
+      </g>
+      <!-- kiosk shell -->
+      <rect x="60" y="96" width="760" height="296" rx="8" fill="#0e161b" stroke="#34c8e0" stroke-width="2"/>
+      <rect x="48" y="82" width="784" height="20" rx="5" fill="#101c22" stroke="#34c8e0" stroke-width="1.6"/>
+      <g stroke="#25333a" stroke-width="1.4">
+        <line x1="86" y1="120" x2="170" y2="120"/><line x1="86" y1="128" x2="170" y2="128"/><line x1="86" y1="136" x2="170" y2="136"/>
+      </g>
+      <!-- dividers -->
+      <line x1="320" y1="96" x2="320" y2="392" stroke="#25333a" stroke-width="1.5" stroke-dasharray="4 4"/>
+      <line x1="560" y1="96" x2="560" y2="392" stroke="#25333a" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+      <!-- CH1 MV -->
+      <rect x="62" y="98" width="256" height="292" fill="rgba(255,77,94,0.055)"/>
+      <text x="88" y="170" fill="#ff4d5e" font-size="12" font-family="monospace" letter-spacing="1">MV CHAMBER</text>
+      <text x="88" y="188" fill="#8a9ba1" font-size="11" font-family="monospace">11 kV incoming</text>
+      <!-- hazard -->
+      <g transform="translate(150,232)"><path d="M28 0 L56 48 L0 48 Z" fill="none" stroke="#ff4d5e" stroke-width="2"/>
+        <line x1="28" y1="16" x2="28" y2="34" stroke="#ff4d5e" stroke-width="3"/><circle cx="28" cy="41" r="1.8" fill="#ff4d5e"/></g>
+      <text x="190" y="330" fill="#ff4d5e" font-size="12" font-family="monospace" text-anchor="middle" letter-spacing="1">NO-GO ZONE</text>
+      <!-- incoming underground cable -->
+      <path d="M120 392 L120 340 Q120 320 150 320 L150 300" fill="none" stroke="#ff4d5e" stroke-width="3" opacity=".6"/>
+
+      <!-- CH2 transformer -->
+      <text x="440" y="132" fill="#f4a63b" font-size="12" font-family="monospace" text-anchor="middle" letter-spacing="1">TRANSFORMER</text>
+      <g transform="translate(388,168)" fill="none" stroke="#f4a63b" stroke-width="2">
+        <rect x="0" y="0" width="104" height="150" rx="6" fill="#120f0a"/>
+        <circle cx="34" cy="75" r="30"/><circle cx="70" cy="75" r="30"/>
+        <g stroke="#f4a63b" stroke-width="1.3">
+          <line x1="14" y1="55" x2="54" y2="55"/><line x1="14" y1="68" x2="54" y2="68"/><line x1="14" y1="81" x2="54" y2="81"/><line x1="14" y1="94" x2="54" y2="94"/>
+        </g>
+      </g>
+      <text x="440" y="342" fill="#8a9ba1" font-size="10.5" font-family="monospace" text-anchor="middle">11 kV → 380/220 V</text>
+      <!-- flow arrows -->
+      <path d="M300 250 L340 250" stroke="#f4a63b" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+      <path d="M500 250 L560 250" stroke="#34c8e0" stroke-width="2" fill="none" marker-end="url(#ar2)"/>
+      <defs>
+        <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#f4a63b"/></marker>
+        <marker id="ar2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#34c8e0"/></marker>
+      </defs>
+
+      <!-- CH3 LV panel — OUR ZONE -->
+      <rect x="562" y="98" width="256" height="292" fill="rgba(52,200,224,0.07)"/>
+      <text x="588" y="132" fill="#34c8e0" font-size="12" font-family="monospace" letter-spacing="1">LV PANEL · OUR ZONE</text>
+      <!-- busbars L1 L2 L3 -->
+      <g stroke="#e08a4a" stroke-width="5" stroke-linecap="round">
+        <line x1="586" y1="200" x2="812" y2="200"/><line x1="586" y1="240" x2="812" y2="240"/><line x1="586" y1="280" x2="812" y2="280"/>
+      </g>
+      <text x="822" y="204" fill="#8a9ba1" font-size="10" font-family="monospace">L1</text>
+      <text x="822" y="244" fill="#8a9ba1" font-size="10" font-family="monospace">L2</text>
+      <text x="822" y="284" fill="#8a9ba1" font-size="10" font-family="monospace">L3</text>
+      <!-- rogowski coils around each busbar -->
+      <g fill="none" stroke="#34c8e0" stroke-width="2.2">
+        <ellipse cx="650" cy="200" rx="13" ry="19"/><ellipse cx="650" cy="240" rx="13" ry="19"/><ellipse cx="650" cy="280" rx="13" ry="19"/>
+      </g>
+      <!-- coil leads to edge node -->
+      <path d="M663 200 Q720 200 720 300 L742 300" fill="none" stroke="#34c8e0" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <path d="M663 240 Q715 240 715 300 L742 300" fill="none" stroke="#34c8e0" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <path d="M663 280 Q710 280 710 300 L742 300" fill="none" stroke="#34c8e0" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <!-- edge node IP65 -->
+      <rect x="742" y="286" width="58" height="46" rx="5" fill="#0d1519" stroke="#34c8e0" stroke-width="1.8"/>
+      <circle cx="752" cy="296" r="2" fill="#3ddc84"/>
+      <text x="771" y="314" fill="#8a9ba1" font-size="8.5" font-family="monospace" text-anchor="middle">EDGE</text>
+      <text x="771" y="325" fill="#8a9ba1" font-size="8.5" font-family="monospace" text-anchor="middle">IP65</text>
+      <!-- antenna out of roof -->
+      <line x1="790" y1="286" x2="790" y2="60" stroke="#34c8e0" stroke-width="1.8"/>
+      <path d="M783 66 q7 -8 14 0" fill="none" stroke="#34c8e0" stroke-width="1.8"/>
+      <!-- outgoing feeders to street -->
+      <g stroke="#e08a4a" stroke-width="2" opacity=".55">
+        <path d="M812 240 L860 240 L860 360 L900 360"/>
+      </g>
+      <g fill="none" stroke="#5f7178" stroke-width="1.4">
+        <path d="M888 360 l12 -10 12 10 v18 h-24 z"/>
+      </g>
+      <text x="900" y="392" fill="#5f7178" font-size="9" font-family="monospace" text-anchor="middle">loads</text>
+    </svg>
+    <div class="dlegend">
+      <span><i style="background:#ff4d5e"></i>MV — never touched (11 kV)</span>
+      <span><i style="background:#f4a63b"></i>Transformer</span>
+      <span><i style="background:#34c8e0"></i>LV panel — our sensing zone</span>
+      <span><i style="background:#e08a4a"></i>Copper busbars</span>
+    </div>
+  </div>
+  <p class="note">Schematic cross-section, not to scale. The kiosk photo that prompted this is a real RMU in Kafr El-Sheikh — the exact unit type we retrofit.</p>
+</div></header>
+
+<!-- anatomy -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">01</span><div>
+    <h2>Inside the iron box — three chambers</h2>
+    <p class="kicker">The kiosk is partitioned. We stay out of the dangerous half entirely and work only where the street-level power leaves — the low-voltage panel.</p>
+  </div></div>
+  <div class="chambers">
+    <div class="cham no"><span class="strip" style="background:var(--theft)"></span>
+      <div class="z">◆ Never touched</div><h3>MV chamber</h3>
+      <p>Incoming 11 kV feeders from the primary substation. Lethal, sealed, and completely outside our workflow. We never open or instrument this side.</p></div>
+    <div class="cham mid"><span class="strip" style="background:var(--tech)"></span>
+      <div class="z">● Pass-through</div><h3>The transformer</h3>
+      <p>Steps 11 kV down to 380/220 V. We measure its output, not its internals — the transformer is simply the source of the current we watch.</p></div>
+    <div class="cham our"><span class="strip" style="background:var(--signal)"></span>
+      <div class="z">● Our zone</div><h3>LV panel</h3>
+      <p>Thick copper busbars carry hundreds–thousands of amps out to the streets and workshops. This is where energy balance is measured — and where theft downstream shows up.</p></div>
+  </div>
+</div></section>
+
+<!-- hardware upgrade -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">02</span><div>
+    <h2>The sensor grows up</h2>
+    <p class="kicker">The bench clamp proves the physics on a lamp and a hair-dryer. It can't wrap a 2,000-amp busbar — so production swaps it for a flexible coil that can.</p>
+  </div></div>
+  <div class="cmp">
+    <div class="cc poc"><div class="pic">
+      <svg viewBox="0 0 150 130"><g fill="none" stroke="#34c8e0" stroke-width="1.7">
+        <circle cx="75" cy="52" r="30"/><circle cx="75" cy="52" r="10" stroke="#e08a4a"/>
+        <path d="M75 22 a30 30 0 0 1 0 60" stroke="#34c8e0" stroke-width="7" opacity=".3"/>
+        <rect x="65" y="82" width="20" height="16" rx="2" fill="#0d1519"/><line x1="75" y1="98" x2="75" y2="118"/></g>
+        <text x="120" y="46" fill="#8a9ba1" font-size="9" font-family="monospace">13mm</text></svg></div>
+      <div class="body"><div class="tag">Proof of concept</div><h3>SCT-013-000 clamp</h3>
+        <p>13 mm aperture, 100 A. Perfect on the bench; too small for a busbar.</p>
+        <ul><li>Non-invasive around a single cable</li><li>Cheap, instant to demo</li><li>Reads the lamp-vs-dryer theft scenario</li></ul>
+        <div class="verdict">Role: prove the detection math end-to-end.</div></div></div>
+
+    <div class="cc prod"><div class="pic">
+      <svg viewBox="0 0 150 130"><g fill="none" stroke="#34c8e0" stroke-width="1.7">
+        <ellipse cx="72" cy="56" rx="46" ry="34"/><ellipse cx="72" cy="56" rx="46" ry="34" stroke-dasharray="3 4" opacity=".5"/>
+        <rect x="58" y="86" width="28" height="13" rx="6" fill="#0d1519"/><line x1="86" y1="92" x2="112" y2="104"/>
+        <line x1="46" y1="56" x2="98" y2="56" stroke="#e08a4a" stroke-width="6" stroke-linecap="round"/></g></svg></div>
+      <div class="body"><div class="tag">Production</div><h3>Rogowski coil ×3</h3>
+        <p>A flexible "rope CT" — the technician just wraps it around the busbar and clips it shut. One per phase (L1/L2/L3).</p>
+        <ul><li>Fits any busbar or fat cable, in tight panels</li><li>Reads up to ~5,000 A with a safe low-level output</li><li>No cables disconnected — zero outage</li><li>Alt: industrial hinged split-core CT</li></ul>
+        <div class="verdict">Role: kiosk-grade sensing on live busbars.</div></div></div>
+  </div>
+</div></section>
+
+<!-- deployment workflow -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">03</span><div>
+    <h2>The deployment workflow</h2>
+    <p class="kicker">What a two-person crew actually does at the kiosk — a repeatable, ~30-minute, no-outage retrofit. The order matters, so it's numbered.</p>
+  </div></div>
+  <div class="flow">
+    <div class="step"><div class="n">01</div><div>
+      <h3>Coordinate &amp; open</h3>
+      <p>Our crew arrives with the EDC's own technicians. The technician opens the kiosk door — the same access used for routine maintenance.</p>
+      <span class="tag">with utility staff</span></div></div>
+    <div class="step"><div class="n">02</div><div>
+      <h3>Non-invasive wrap</h3>
+      <p>Three Rogowski coils are wrapped around the main LV busbars — one per phase — and clipped shut. Nothing is unwired; the power never stops.</p>
+      <span class="tag safe">no galvanic contact</span> <span class="tag live">live, no outage</span></div></div>
+    <div class="step"><div class="n">03</div><div>
+      <h3>Edge-node panel</h3>
+      <p>The ESP32 isn't left bare. It sits on a custom PCB inside a weatherproof <b>IP65 enclosure</b> — with the metering AFE, power supply, and radio.</p>
+      <span class="tag">IP65 · custom PCB</span></div></div>
+    <div class="step"><div class="n">04</div><div>
+      <h3>Mount inside</h3>
+      <p>The enclosure is fixed to the inner wall of the LV chamber with an industrial magnet or screws — out of the way, protected from weather and tampering.</p>
+      <span class="tag">magnet / bolt mount</span></div></div>
+    <div class="step"><div class="n">05</div><div>
+      <h3>Telemetry out</h3>
+      <p>A small antenna is routed <b>outside</b> the metal shell (LoRaWAN or 4G) so the Faraday cage doesn't block it. Contract-valid packets stream to the Grid-Pulse backend.</p>
+      <span class="tag">LoRaWAN / 4G</span></div></div>
+  </div>
+</div></section>
+
+<!-- safety -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">04</span><div>
+    <h2>Why non-invasive wins the contract</h2>
+    <p class="kicker">A utility can't accept anything that risks an outage or a technician. Every design choice here removes a reason to say no.</p>
+  </div></div>
+  <div class="safety">
+    <div class="safebox"><h3>Deployment guarantees</h3>
+      <ul>
+        <li><b>Never enters the MV side</b> — all sensing is on the 380/220 V LV panel.</li>
+        <li><b>No galvanic connection</b> — Rogowski coils couple magnetically; nothing is wired into the live conductor.</li>
+        <li><b>Zero service interruption</b> — no feeder is disconnected to install.</li>
+        <li><b>Reversible</b> — unclip the coils and the kiosk is exactly as it was.</li>
+        <li><b>Tamper-resistant</b> — sealed inside the locked kiosk, only the antenna is exposed.</li>
+      </ul></div>
+    <div>
+      <p class="why">This is the difference between a science-fair gadget and something the <b>Ministry of Electricity can roll out across 90,000 kiosks</b>. The physics is the same as the bench demo — a current transformer and an energy balance — but the packaging is built for the iron box in the photo.</p>
+      <div class="links">
+        <a href="../pitch/index.html">← The pitch</a>
+        <a href="../business/index.html">Business &amp; financials →</a>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<div class="wrap foot">
+  <span>Grid-Pulse NTL — Field Deployment · non-invasive retrofit of distribution kiosks (RMU)</span>
+  <span class="mono">MV · Transformer · LV panel</span>
+</div>

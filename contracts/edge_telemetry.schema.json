@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grid-pulse.ntl/contracts/edge_telemetry.schema.json",
+  "title": "Grid-Pulse NTL — Edge Telemetry Payload",
+  "description": "Strict contract for the payload an Edge Node (ESP32) POSTs to FastAPI /ingest. The backend MUST reject any payload that does not validate (HTTP 422).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "device_id", "ts", "seq", "site", "measurement"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Contract version. Bump on breaking changes."
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^GP-EDGE-[A-Z0-9]{4,12}$",
+      "description": "Unique edge-node id, e.g. GP-EDGE-000123."
+    },
+    "firmware": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic firmware version, e.g. 1.0.0."
+    },
+    "ts": {
+      "type": "integer",
+      "minimum": 1700000000,
+      "description": "Unix epoch seconds (UTC) at end of the measurement window."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic sequence number per device (gap detection / replay guard)."
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transformer_id"],
+      "properties": {
+        "transformer_id": { "type": "string", "pattern": "^TX-[A-Z0-9-]{3,20}$" },
+        "feeder_id": { "type": "string", "maxLength": 16 },
+        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+        "lng": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window_ms", "phases"],
+      "properties": {
+        "window_ms": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 60000,
+          "description": "Averaging window length in milliseconds."
+        },
+        "energy_wh_interval": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Active energy (Wh) integrated over this window; used for energy balance."
+        },
+        "phases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/phase" }
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Ambient context for the AI technical-loss baseline.",
+      "properties": {
+        "temp_c": { "type": "number", "minimum": -20, "maximum": 90 },
+        "humidity_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "enclosure_temp_c": { "type": "number", "minimum": -20, "maximum": 120 }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rssi_dbm": { "type": "integer", "minimum": -120, "maximum": 0 },
+        "uptime_s": { "type": "integer", "minimum": 0 },
+        "tamper": { "type": "boolean", "description": "Anti-tamper flag (Phase 2)." }
+      }
+    },
+    "sig": {
+      "type": "string",
+      "pattern": "^hmac-sha256:[A-Za-z0-9+/=]+$",
+      "description": "Optional HMAC-SHA256 over the canonical payload (zero-trust; Phase 2)."
+    }
+  },
+  "$defs": {
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "i_rms_a", "p_active_w", "power_factor", "freq_hz"],
+      "properties": {
+        "phase": { "type": "string", "enum": ["L1", "L2", "L3", "single"] },
+        "i_rms_a": { "type": "number", "minimum": 0, "maximum": 5000, "description": "RMS current (A)." },
+        "v_rms_v": { "type": "number", "minimum": 0, "maximum": 1000, "description": "RMS voltage (V); null if not measured." },
+        "p_active_w": { "type": "number", "minimum": -100000, "maximum": 5000000, "description": "Active power (W)." },
+        "s_apparent_va": { "type": "number", "minimum": 0, "maximum": 5000000, "description": "Apparent power (VA)." },
+        "power_factor": { "type": "number", "minimum": 0, "maximum": 1, "description": "Active/apparent." },
+        "freq_hz": { "type": "number", "minimum": 45, "maximum": 65, "description": "Line frequency (Hz)." },
+        "thd_i_pct": { "type": "number", "minimum": 0, "maximum": 100, "description": "Current total harmonic distortion (%)." },
+        "harmonics": {
+          "type": "array",
+          "maxItems": 16,
+          "description": "Optional per-harmonic magnitudes from the edge FFT.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["h", "mag_pct"],
+            "properties": {
+              "h": { "type": "integer", "minimum": 1, "maximum": 50, "description": "Harmonic order (1 = fundamental)." },
+              "mag_pct": { "type": "number", "minimum": 0, "maximum": 100, "description": "Magnitude as % of fundamental." }
+            }
+          }
+        }
+      }
+    }
+  }
+}

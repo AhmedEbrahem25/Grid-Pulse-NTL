@@ -22,6 +22,7 @@ services:
       - ./backend:/app
       - ./ml/artifacts:/app/artifacts
       - ./dashboard:/app/dashboard
+      - gpdata:/data
     depends_on:
       redis:
         condition: service_healthy
@@ -35,6 +36,10 @@ services:
     volumes:
       - ./backend:/app
       - ./ml/artifacts:/app/artifacts
+      - gpdata:/data
     depends_on:
       redis:
         condition: service_healthy
+
+volumes:
+  gpdata:

@@ -4,6 +4,7 @@ colours, mono readouts). Run in a container that has python-pptx:
 
     pip install python-pptx && python build_pptx.py
 """
+import os
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
@@ -35,6 +36,13 @@ prs.slide_width = Inches(13.333)
 prs.slide_height = Inches(7.5)
 BLANK = prs.slide_layouts[6]
 W, H = 13.333, 7.5
+IMG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
+
+
+def photo(s, name, x, y, w):
+    pic = s.shapes.add_picture(os.path.join(IMG, name), Inches(x), Inches(y), width=Inches(w))
+    pic.line.color.rgb = LINE2; pic.line.width = Pt(1.25); pic.shadow.inherit = False
+    return pic
 
 
 def slide():
@@ -369,7 +377,50 @@ para(tf, [("Customer: ", {"color": FG, "size": 15, "bold": True}),
      line=1.35, first=True)
 
 
-# ============================================================ Slide 7 — close
+# ============================================================ Slide — deployment (photo)
+s = slide()
+eyebrow(s, 0.7, 0.6, "06", "DEPLOYMENT · KAFR EL-SHEIKH")
+tf = box(s, 0.7, 1.05, 11.9, 1.0)
+para(tf, [("Onto the real iron box", {"color": FG, "size": 34, "bold": True, "font": SANS_B})], first=True)
+tf = box(s, 0.7, 1.95, 11.9, 0.7)
+para(tf, [("The field target is a sealed distribution kiosk (RMU). We retrofit it non-invasively on the "
+           "low-voltage side — no outage, nothing bolted to the 11 kV.", {"color": MUTED, "size": 15})], line=1.3, first=True)
+photo(s, "kiosk.jpg", 0.9, 3.0, 3.8)
+tf = box(s, 0.9, 6.35, 3.8, 0.3)
+para(tf, [("Distribution kiosk (RMU) · Kafr El-Sheikh", {"color": DIM, "font": MONO, "size": 10})], first=True)
+dpts = [("Wrap 3 Rogowski coils", "around the LV busbars — one per phase"),
+        ("IP65 edge node", "custom PCB inside the panel; antenna routed outside the metal shell"),
+        ("MV chamber never touched", "no galvanic contact, no feeder disconnected"),
+        ("~30 min &amp; reversible", "zero service interruption — unclip and it's as it was")]
+yy = 3.15
+for t, d in dpts:
+    tf = box(s, 5.3, yy, 7.4, 0.8)
+    para(tf, [("✓  ", {"color": OK, "font": MONO, "size": 14, "bold": True}),
+              (t.replace("&amp;", "&"), {"color": FG, "size": 16, "bold": True})], first=True)
+    para(tf, [("      " + d, {"color": MUTED, "size": 13})], space_before=1)
+    yy += 0.86
+
+# ============================================================ Slide — product (dashboard photo)
+s = slide()
+eyebrow(s, 0.7, 0.6, "07", "THE PRODUCT · LIVE")
+tf = box(s, 0.7, 1.05, 11.9, 0.8)
+para(tf, [("Running, not rendered", {"color": FG, "size": 34, "bold": True, "font": SANS_B})], first=True)
+photo(s, "dashboard.jpg", 0.7, 1.95, 5.3)
+tf = box(s, 6.5, 2.5, 6.1, 0.9)
+para(tf, [("94%", {"color": THEFT, "font": MONO, "size": 46, "bold": True}),
+          ("  live theft verdict", {"color": MUTED, "size": 14})], first=True)
+ppts = ["Reasons checklist — 5/5 independent signals fired",
+        "Colour-coded fleet map — green / amber / red at a glance",
+        "Measured-loss trend + one-tap dispatch to inspection"]
+yy = 3.7
+for p in ppts:
+    tf = box(s, 6.5, yy, 6.1, 0.6)
+    para(tf, [("›  ", {"color": SIGNAL, "font": MONO, "size": 14}), (p, {"color": "#c3d0d4" and RGBColor(0xC3, 0xD0, 0xD4), "size": 14})], first=True)
+    yy += 0.62
+tf = box(s, 6.5, yy + 0.15, 6.1, 0.6)
+para(tf, [("Every figure in this deck comes straight out of this running system.", {"color": DIM, "size": 12.5})], first=True)
+
+# ============================================================ Slide — close
 s = slide()
 tf = box(s, 1.0, 2.4, 11.3, 0.5)
 para(tf, [("THE PITCH, IN ONE LINE", {"color": SIGNAL, "font": MONO, "size": 12.5, "spacing": 3.0})], align=PP_ALIGN.CENTER, first=True)

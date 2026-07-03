@@ -38,18 +38,22 @@ def _post(path, body, auth=False):
         return None
 
 
-def ingest(total_w, pf, thd, temp):
+_H_NORMAL = [{"h": 3, "mag_pct": 2.0}, {"h": 5, "mag_pct": 2.5}]
+
+
+def ingest(total_w, pf, thd, temp, harmonics=None):
     global seq
     seq += 1
     payload = {
-        "schema_version": "1.0", "device_id": "GP-EDGE-SIM001", "firmware": "1.0.0",
+        "schema_version": "1.0", "device_id": "GP-EDGE-SIM001", "firmware": "1.1.0",
         "ts": int(time.time()), "seq": seq,
         "site": {"transformer_id": TX, "feeder_id": "F-03", "lat": 31.1107, "lng": 30.9388},
         "measurement": {"window_ms": 1000, "energy_wh_interval": round(total_w / 3600, 3),
                         "phases": [{"phase": "single", "i_rms_a": round(total_w / 230, 1),
                                     "v_rms_v": 230.0, "p_active_w": total_w,
                                     "s_apparent_va": round(total_w / max(pf, .01), 1),
-                                    "power_factor": pf, "freq_hz": 49.98, "thd_i_pct": thd}]},
+                                    "power_factor": pf, "freq_hz": 49.98, "thd_i_pct": thd,
+                                    "harmonics": harmonics or _H_NORMAL}]},
         "env": {"temp_c": temp, "humidity_pct": 50.0},
     }
     return _post("/ingest", payload, auth=True)

@@ -41,6 +41,12 @@ def _try_load():
             _model = None
 
 
+def has_model() -> bool:
+    """Read-only: is the trained regressor loaded? (used by the accounting layer's confidence)."""
+    _try_load()
+    return _model is not None
+
+
 def _physics(load_w: float, temp_c: float) -> float:
     temp_factor = max(0.2, 1.0 + TEMP_COEFF * (temp_c - NOMINAL_TEMP_C))
     return max(0.0, load_w * BASE_LOSS_FRAC * temp_factor)

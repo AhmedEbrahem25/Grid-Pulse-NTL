@@ -5,12 +5,12 @@ energy balance), recent edge readings, and verdicts.
 """
 from __future__ import annotations
 
-import itertools
 import threading
 import time
-import uuid
 from collections import defaultdict, deque
 from typing import Deque, Dict, List, Optional
+
+from . import db
 
 _lock = threading.Lock()
 
@@ -19,7 +19,23 @@ transformers: Dict[str, dict] = {}
 registered_load_w: Dict[str, float] = defaultdict(float)
 readings: Dict[str, Deque[dict]] = defaultdict(lambda: deque(maxlen=300))
 verdicts: List[dict] = []
-_verdict_seq = itertools.count(1)
+_verdict_seq = 0
+
+
+def load_persisted() -> None:
+    """Restore recent verdicts from the DB on boot so history survives restarts."""
+    global _verdict_seq
+    if not db.init():
+        return
+    rows = db.load_recent_verdicts()   # newest-first, matches our in-memory order
+    with _lock:
+        if not verdicts:
+            verdicts.extend(rows)
+        for v in rows:
+            try:
+                _verdict_seq = max(_verdict_seq, int(str(v.get("id", "V-0")).split("-")[-1]))
+            except Exception:
+                pass
 
 
 def seed() -> None:
@@ -53,6 +69,7 @@ def get_registered_load(transformer_id: str) -> float:
 def add_reading(transformer_id: str, reading: dict) -> None:
     with _lock:
         readings[transformer_id].append(reading)
+    db.save_reading(transformer_id, reading)
 
 
 def recent_loads(transformer_id: str, n: int = 60) -> List[float]:
@@ -60,10 +77,13 @@ def recent_loads(transformer_id: str, n: int = 60) -> List[float]:
 
 
 def add_verdict(v: dict) -> dict:
+    global _verdict_seq
     with _lock:
-        v = {"id": f"V-{next(_verdict_seq):05d}", "created_at": int(time.time()), **v}
+        _verdict_seq += 1
+        v = {"id": f"V-{_verdict_seq:05d}", "created_at": int(time.time()), **v}
         verdicts.insert(0, v)
         del verdicts[500:]  # cap
+    db.save_verdict(v)
     return v
 
 
@@ -72,6 +92,7 @@ def set_verdict_status(verdict_id: str, status: str) -> Optional[dict]:
         for v in verdicts:
             if v["id"] == verdict_id:
                 v["status"] = status
+                db.set_status(verdict_id, status)
                 return v
     return None
 

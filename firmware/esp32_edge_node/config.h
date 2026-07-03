@@ -20,11 +20,24 @@
 #define CAL_FACTOR       60.6      // EmonLib current calibration
 #define ADC_SAMPLES      1480      // samples per calcIrms() call
 
-// --- Electrical assumptions for the POC ---
-// The SCT gives current only. Without a voltage sensor (e.g. ZMPT101B) we assume
-// nominal voltage and a power factor; add voltage sensing to measure PF/THD for real.
+// --- Voltage sensing (ZMPT101B) -> REAL active power, power factor & THD ---
+// The ZMPT101B steps the 230V line down to a small AC signal, biased to ~1.65V,
+// into another ADC pin. EmonLib calcVI() then gives true realPower/PF; a windowed
+// FFT on the current gives THD + the harmonic vector the backend 1D-CNN classifies.
+#define V_ADC_PIN        35        // ESP32 ADC1 pin fed by the ZMPT101B output (1.65V-biased)
+#define V_CAL            234.26    // EmonLib voltage calibration (tune against a known Vrms)
+#define PHASE_CAL        1.7       // EmonLib V/I phase-alignment calibration
+#define VI_CROSSINGS     20        // half-cycles per calcVI() (EmonLib)
+#define VI_TIMEOUT_MS    2000
+
+// --- FFT for harmonics / THD ---
+#define FFT_N            256       // samples per FFT frame
+#define FFT_FS           2560.0    // Hz -> the 50 Hz fundamental lands on integer bin 5 (5 cycles/frame)
+#define ADC_BIAS         2048      // 12-bit mid-rail = the 1.65V DC bias
+
+// --- Fallbacks (used only if a channel is absent) ---
 #define NOMINAL_V        230.0
-#define ASSUMED_PF       0.95      // replace with measured PF when voltage sensing is added
+#define ASSUMED_PF       0.95
 #define LINE_FREQ        50.0
 
 // --- Ambient (DHT22 optional; else a fixed value the backend still uses) ---

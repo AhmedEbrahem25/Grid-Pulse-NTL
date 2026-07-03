@@ -30,11 +30,27 @@ EmonLib needs a **calibration factor = turns_ratio / burden_ohms**.
 
 Then trim: clamp the CT around a **known load** (e.g. a 1000 W heater at 230 V ≈ 4.35 A) and adjust `CAL_FACTOR` until `Irms` matches within ±5%.
 
-## POC scope / honesty
+## Voltage sensing (ZMPT101B) — real PF, THD & harmonics
 
-- The SCT gives **current only**. We assume nominal voltage (`230 V`) and a fixed `power_factor` (`0.95`). To measure **real PF and THD** (the harmonic theft signal), add a voltage sensor (e.g. **ZMPT101B**) and FFT the two waveforms.
-- Production uses **Rogowski coils** around the LV busbars in the transformer kiosk — see `plan/05-demo-pitch.md` §5.
+The firmware now reads a **ZMPT101B** voltage module alongside the CT, so it sends
+*measured* active power, power factor, THD and a harmonic vector (not assumptions).
+
+```
+   230V line ──► ZMPT101B module ──► AC out (biased to ~1.65V) ──► GPIO35 (ADC1)
+   (the module has its own on-board burden + a bias trim-pot; set the pot so the
+    idle output sits at ~1.65V / ADC ~2048, mirroring the CT bias above)
+```
+
+- `emon1.voltage(V_ADC_PIN=35, V_CAL=234.26, PHASE_CAL=1.7)` + `emon1.current(...)`; `emon1.calcVI()` returns **Vrms, Irms, realPower, powerFactor**.
+- A windowed **FFT** (`arduinoFFT`) on the current channel yields **THD** and the `harmonics[]` vector (odd orders 3..15, % of fundamental) — this is what the backend **1D-CNN** classifies as clean / legit-industrial / illegal-bypass.
+- `FFT_FS = 2560 Hz` puts the 50 Hz fundamental on integer bin 5 (5 cycles/frame) so harmonic bins line up exactly.
+
+**Calibrate voltage:** with a known Vrms on the line, trim `V_CAL` until `Vrms` matches; adjust `PHASE_CAL` until PF on a resistive load reads ≈ 1.0.
+
+## Production
+
+Production swaps the SCT clamp for **Rogowski coils** around the LV busbars in the transformer kiosk (up to ~5000 A, non-invasive), an **IP65** enclosure, and **LoRaWAN/4G** backhaul — see `deployment/index.html` and `plan/05-demo-pitch.md` §5.
 
 ## Flash
 
-Arduino IDE → install **ESP32 boards** + the **EmonLib** library → open `esp32_edge_node.ino` → edit `config.h` (WiFi, `INGEST_URL`, `INGEST_TOKEN`) → upload. Watch Serial at 115200: `Irms=.. P=.. -> 200`.
+Arduino IDE → install **ESP32 boards** + **EmonLib** + **arduinoFFT (≥2.0)** → open `esp32_edge_node.ino` → edit `config.h` (WiFi, `INGEST_URL`, `INGEST_TOKEN`, pins) → upload. Watch Serial at 115200: `V=.. I=.. P=.. PF=.. THD=.. -> 200`.

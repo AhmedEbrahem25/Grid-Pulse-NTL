@@ -1,0 +1,33 @@
+{
+  "n": 600,
+  "theft_precision": 1.0,
+  "theft_recall": 0.783,
+  "theft_f1": 0.879,
+  "confusion": {
+    "tp": 123,
+    "fp": 0,
+    "fn": 34,
+    "tn": 443
+  },
+  "brier_score": 0.0582,
+  "brier_calibrated": 0.0526,
+  "false_alarm_rate_industrial": 0.0,
+  "per_class": {
+    "normal": {
+      "n": 141,
+      "theft_flag": 0
+    },
+    "technical": {
+      "n": 163,
+      "theft_flag": 0
+    },
+    "industrial": {
+      "n": 139,
+      "theft_flag": 0
+    },
+    "theft": {
+      "n": 157,
+      "theft_flag": 123
+    }
+  }
+}

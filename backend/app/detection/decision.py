@@ -16,7 +16,7 @@ from typing import List
 
 from ..config import settings
 from ..contract import EdgePayload
-from . import anomaly, energy_balance, harmonics, technical_loss
+from . import accounting, anomaly, energy_balance, harmonic_cnn, harmonics, technical_loss
 
 
 def _clamp(x, lo=0.0, hi=1.0):
@@ -48,6 +48,12 @@ def run_detection(payload: EdgePayload, transformer: dict,
     anom = anomaly.anomaly_score(load_w, dt.hour, residual, recent_loads)
     margin = settings.residual_alert_w
 
+    # 1D-CNN harmonic-signature classifier: tells a *registered* high-THD factory
+    # (legit_industrial) apart from an illegal hook (illegal_bypass). Degrades to a rule.
+    harm = harmonic_cnn.classify(ph[0].harmonics if ph else None, thd, pf)
+    legit_ind = harm["class"] == "legit_industrial"
+    sig_label = harm["class"].replace("_", "-") + " signature"
+
     # --- reasons checklist (ss.md) ---
     reasons = [
         {"label": "Energy imbalance", "met": residual > margin,
@@ -56,8 +62,10 @@ def run_detection(payload: EdgePayload, transformer: dict,
          "detail": f"actual {pct_over_expected:+.0f}% vs AI baseline"},
         {"label": "Power factor dropped", "met": pf < settings.healthy_pf,
          "detail": f"{pf:.2f} (healthy >= {settings.healthy_pf:.2f})"},
-        {"label": "THD increased", "met": thd > settings.thd_alert_pct,
-         "detail": f"{thd:.1f}% (alert > {settings.thd_alert_pct:.0f}%)"},
+        # High THD only counts as a *theft* indicator when the harmonic shape is an
+        # illegal signature — not a legit-industrial one whose balance already holds.
+        {"label": "THD increased", "met": thd > settings.thd_alert_pct and not (legit_ind and residual <= margin),
+         "detail": f"{thd:.1f}% — {sig_label}"},
         # A temporal outlier only points to theft when it's an *excess* draw --
         # a sudden load drop is anomalous but not theft. Gate on positive residual
         # so NORMAL/technical never show this tick after a theft replay.
@@ -67,6 +75,11 @@ def run_detection(payload: EdgePayload, transformer: dict,
 
     # --- classify ---
     theft = (residual > margin and (sig > 0.30 or anom > 0.50)) or (residual > 2 * margin)
+    # The 1D-CNN earns its place here: a legit-industrial harmonic signature clears a
+    # *modest* unexplained residual (PFC lag / metering timing) so a registered factory
+    # isn't flagged. A clear excess (> 3x margin) still trips regardless.
+    if legit_ind and residual < 3 * margin:
+        theft = False
     heat_inflated = expected_now > 1.15 * max(expected_nominal, 1e-6)
 
     if theft:
@@ -102,6 +115,23 @@ def run_detection(payload: EdgePayload, transformer: dict,
 
     theft_probability = round(confidence * 100) if label == "NTL_THEFT_SUSPECTED" else 0
 
+    # --- NEW: Transformer Energy Accounting Layer (independent evidence, folded bounded) ---
+    # Additive only: it never flips the label or the 5-reason checklist. It folds a small,
+    # bounded adjustment into the theft probability (deviation from strong agreement -> damps
+    # borderline/false-positive cases) and exposes its own numbers for the XAI + dashboard.
+    accounting_ev = None
+    try:
+        accounting_ev = accounting.compute(load_w, registered_load_w, expected_now, recent_loads,
+                                           model_loaded=technical_loss.has_model())
+        if label == "NTL_THEFT_SUSPECTED":
+            applied = int(_clamp(round(accounting_ev["evidence_weight"] *
+                                       (accounting_ev["contribution_pct"] - settings.accounting_neutral_contrib)),
+                                 -15, 5))
+            accounting_ev["applied_contribution"] = applied
+            theft_probability = int(_clamp(theft_probability + applied, 55, 99))
+    except Exception:
+        accounting_ev = None
+
     return {
         "transformer_id": payload.site.transformer_id,
         "ts": payload.ts,
@@ -115,8 +145,10 @@ def run_detection(payload: EdgePayload, transformer: dict,
         "pct_over_expected": round(pct_over_expected, 1),
         "theft_estimate_w": round(theft_estimate, 1),
         "severity": severity,
+        "harmonic_class": harm["class"],
+        "accounting": accounting_ev,
         "explanation": _explain(label, measured_loss, expected_now, residual,
-                                pf, thd, theft_estimate, theft_probability, reasons),
+                                pf, thd, theft_estimate, theft_probability, reasons, harm, accounting_ev),
         "reasons": reasons,
         "features_used": technical_loss.FEATURES,
         "status": "open",
@@ -124,11 +156,13 @@ def run_detection(payload: EdgePayload, transformer: dict,
     }
 
 
-def _explain(label, measured, expected, residual, pf, thd, theft_w, prob, reasons) -> dict:
+def _explain(label, measured, expected, residual, pf, thd, theft_w, prob, reasons, harm, acc=None) -> dict:
     if label == "NTL_THEFT_SUSPECTED":
         summary = f"Theft probability {prob}% - ~{theft_w/1000:.2f} kW unaccounted beyond natural loss"
     elif label == "TECHNICAL_LOSS":
         summary = f"Technical loss ~{measured:.0f} W - explained by temperature/load (no theft)"
+    elif harm.get("class") == "legit_industrial" and thd > settings.thd_alert_pct:
+        summary = "Normal - high THD explained as a legit industrial signature (registered load)"
     else:
         summary = "Normal - energy balance holds"
     factors = [
@@ -137,7 +171,17 @@ def _explain(label, measured, expected, residual, pf, thd, theft_w, prob, reason
          "weight": 0.5},
         {"signal": "power factor", "detail": f"{pf:.2f} (healthy >= {settings.healthy_pf:.2f})", "weight": 0.3},
         {"signal": "current THD", "detail": f"{thd:.1f}% (alert > {settings.thd_alert_pct:.0f}%)", "weight": 0.2},
+        {"signal": "harmonic signature (1D-CNN)",
+         "detail": f"{harm['class'].replace('_','-')} · p_illegal={harm['p_illegal']:.2f} ({harm['source']})", "weight": 0.2},
     ]
+    accounting_block = None
+    if acc:
+        factors.append({"signal": "transformer energy accounting",
+                        "detail": f"excess {acc['excess_loss_kwh']:+.2f} kWh ({acc['excess_loss_pct']:+.0f}%) · "
+                                  f"{acc['stance']} · contribution {acc['contribution_pct']:+d}%",
+                        "weight": 0.2})
+        accounting_block = acc
     recommended = "dispatch field inspection" if label == "NTL_THEFT_SUSPECTED" else "monitor"
     return {"summary": summary, "theft_probability": prob,
-            "reasons": [r for r in reasons if r["met"]], "factors": factors, "recommended": recommended}
+            "reasons": [r for r in reasons if r["met"]], "factors": factors,
+            "accounting": accounting_block, "recommended": recommended}

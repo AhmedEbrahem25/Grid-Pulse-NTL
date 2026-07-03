@@ -83,6 +83,7 @@
   button:active{transform:translateY(1px)}
   button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   button.k-normal:hover{border-color:var(--ok)} button.k-technical:hover{border-color:var(--warn)} button.k-theft:hover{border-color:var(--bad)}
+  button.k-industrial:hover{border-color:var(--accent)}
   .btn-accent{background:var(--accent);color:#04141d;border-color:var(--accent);font-weight:600}
   #verdict{transition:border-color .2s,box-shadow .3s}
   #verdict.v-ok{border-left:3px solid var(--ok)}
@@ -120,6 +121,22 @@
   .fitem .ago{color:var(--muted);font-weight:400}
   .empty{color:var(--muted);font-size:13px;text-align:center;padding:26px 10px}
   .row-actions{display:flex;gap:8px;margin-top:14px}
+  /* transformer energy accounting card */
+  #acct-card{transition:border-color .2s}
+  #acct-card.sup{border-left:3px solid var(--bad)}
+  #acct-card.rej{border-left:3px solid var(--ok)}
+  #acct-card.neu{border-left:3px solid var(--border)}
+  .acct-stance{font-size:10px;font-weight:650;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
+  .acct-stance.sup{background:rgba(251,59,87,.16);color:var(--bad)}
+  .acct-stance.rej{background:rgba(52,211,153,.14);color:var(--ok)}
+  .acct-stance.neu{background:#1b1f29;color:var(--muted)}
+  .acct-rows{display:flex;flex-direction:column;margin-top:2px}
+  .acct-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+  .acct-row:last-child{border-bottom:0}
+  .acct-row span{color:var(--muted)} .acct-row b{color:var(--text)}
+  .acct-row.hl b{color:var(--accent)}
+  .acct-contrib{margin-top:11px;font-size:13px;font-weight:600}
+  .acct-reason{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.4}
   a{color:var(--accent)}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   @media (max-width:1100px){main{grid-template-columns:1fr}.col.left,.col.right{display:none}}
@@ -153,6 +170,7 @@
       <span style="align-self:center;color:var(--muted);font-size:12px">Demo:</span>
       <button class="k-normal" onclick="fireScenario('normal')">Normal load</button>
       <button class="k-technical" onclick="fireScenario('technical')">Hot day (technical)</button>
+      <button class="k-industrial" onclick="fireScenario('industrial')">Legit industrial</button>
       <button class="k-theft btn-accent" onclick="fireScenario('theft')">Inject theft</button>
     </div>
   </section>
@@ -179,6 +197,18 @@
           <button onclick="setStatus('dismissed')">Dismiss</button>
         </div>
       </div>
+    </div>
+    <div class="card" id="acct-card" hidden>
+      <h2>Transformer Energy Accounting <span class="acct-stance neu" id="acct-stance"></span></h2>
+      <div class="acct-rows">
+        <div class="acct-row"><span>Incoming energy</span><b class="mono" id="ac-incoming">—</b></div>
+        <div class="acct-row"><span>Registered energy</span><b class="mono" id="ac-registered">—</b></div>
+        <div class="acct-row"><span>Actual loss</span><b class="mono" id="ac-actual">—</b></div>
+        <div class="acct-row"><span>Expected technical loss</span><b class="mono" id="ac-expected">—</b></div>
+        <div class="acct-row hl"><span>Excess loss</span><b class="mono" id="ac-excess">—</b></div>
+      </div>
+      <div class="acct-contrib" id="acct-contrib"></div>
+      <div class="acct-reason" id="acct-reason"></div>
     </div>
     <div class="card">
       <h2>Verdict feed</h2>
@@ -282,6 +312,7 @@ function clearVerdict(t){
   document.getElementById('verdict').className='card';
   document.getElementById('verdict-empty').hidden=false;
   document.getElementById('verdict-body').hidden=true;
+  document.getElementById('acct-card').hidden=true;
 }
 
 /* ---------- verdict handling ---------- */
@@ -328,6 +359,27 @@ function showVerdict(v){
   document.getElementById('m-expected').textContent=kW(v.tech_loss_expected_w);
   document.getElementById('m-residual').textContent=kW(v.residual_w);
   document.getElementById('v-actions').hidden = v.label!=="NTL_THEFT_SUSPECTED";
+  renderAccounting(v.accounting);
+}
+function renderAccounting(a){
+  const card=document.getElementById('acct-card');
+  if(!a){ card.hidden=true; return; }
+  card.hidden=false;
+  const st = a.stance==='supporting'?'sup':a.stance==='rejecting'?'rej':'neu';
+  card.className='card '+st;
+  const chip=document.getElementById('acct-stance'); chip.className='acct-stance '+st;
+  chip.textContent = a.stance==='supporting'?'supports theft':a.stance==='rejecting'?'rejects theft':'inconclusive';
+  const kwh=x=>(x==null?'—':x.toFixed(2)+' kWh');
+  document.getElementById('ac-incoming').textContent=kwh(a.incoming_kwh);
+  document.getElementById('ac-registered').textContent=kwh(a.registered_kwh);
+  document.getElementById('ac-actual').textContent=kwh(a.actual_loss_kwh);
+  document.getElementById('ac-expected').textContent=kwh(a.expected_technical_kwh);
+  document.getElementById('ac-excess').textContent=kwh(a.excess_loss_kwh);
+  const col=st==='sup'?'var(--bad)':st==='rej'?'var(--ok)':'var(--muted)';
+  const sign=(a.contribution_pct>=0?'+':'')+a.contribution_pct+'%';
+  const applied=a.applied_contribution?` <span style="color:var(--muted);font-weight:400">(applied ${a.applied_contribution>0?'+':''}${a.applied_contribution} to final score)</span>`:'';
+  document.getElementById('acct-contrib').innerHTML=`Contribution: <span style="color:${col}">${sign} theft probability</span>${applied}`;
+  document.getElementById('acct-reason').textContent=a.reason||'';
 }
 function animateNum(id,to){ const el=document.getElementById(id); let n=0; const step=Math.max(1,Math.round(to/18));
   clearInterval(el._t); el._t=setInterval(()=>{ n=Math.min(to,n+step); el.textContent=n; if(n>=to)clearInterval(el._t); },20); }

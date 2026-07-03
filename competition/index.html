@@ -1,0 +1,244 @@
+<title>Grid-Pulse NTL — Competitive Landscape</title>
+<style>
+  :root{
+    --ink:#0a0e0f; --ink2:#10161a; --panel:#0e1418; --line:#1e2a2f; --line2:#2a3a41;
+    --fg:#e8eef0; --muted:#8a9ba1; --dim:#5f7178;
+    --signal:#34c8e0; --signal-dim:#1c6a74;
+    --theft:#ff4d5e; --tech:#f4a63b; --ok:#3ddc84;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--fg);font-family:var(--sans);line-height:1.55;font-size:16px;
+    background-image:radial-gradient(120% 80% at 50% -10%, #101a1d 0%, var(--ink) 55%);}
+  ::selection{background:var(--signal);color:#04191c}
+  a{color:var(--signal);text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 26px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  h1,h2,h3,h4{margin:0;letter-spacing:-.02em;text-wrap:balance;font-weight:720;line-height:1.06}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--signal)}
+  section{border-top:1px solid var(--line)}
+  .pad{padding:70px 0}
+  .shead{display:flex;gap:15px;align-items:baseline;margin-bottom:32px}
+  .snum{font-family:var(--mono);font-size:13px;color:var(--signal-dim)}
+  h2{font-size:clamp(24px,3.3vw,34px)}
+  .kicker{color:var(--muted);max-width:70ch;margin:14px 0 0}
+
+  header .hero{padding:90px 0 44px}
+  h1{font-size:clamp(32px,5.4vw,58px)}
+  h1 em{font-style:normal;color:var(--signal)}
+  .sub{max-width:66ch;margin:20px 0 0;font-size:18px;color:#c3d0d4}
+  .note{font-size:12.5px;color:var(--dim);border-left:2px solid var(--line2);padding-left:13px;margin-top:18px;max-width:82ch}
+
+  /* category cards */
+  .cats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .cat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px;display:flex;flex-direction:column}
+  .cat .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .cat h3{font-size:17px;margin-bottom:4px}
+  .cat .ex{font-size:11.5px;color:var(--dim);font-family:var(--mono);margin-bottom:12px}
+  .cat .row{font-size:12.5px;display:flex;gap:8px;margin-top:7px;line-height:1.35}
+  .cat .row.s span:first-child{color:var(--ok)} .cat .row.g span:first-child{color:var(--theft)}
+  .cat .row b{font-weight:600;color:#c6d1d5}
+  .cat .row .lbl{flex:none;width:13px;font-family:var(--mono)}
+  .cat .row .tx{color:var(--muted)}
+
+  /* matrix */
+  .scroll{overflow-x:auto}
+  table.mx{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
+  table.mx th,table.mx td{padding:12px 12px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle}
+  table.mx th:first-child,table.mx td:first-child{text-align:left}
+  table.mx thead th{font-family:var(--mono);font-size:10.5px;color:var(--signal);text-transform:uppercase;letter-spacing:.03em;font-weight:600;vertical-align:bottom}
+  table.mx td:first-child{color:var(--fg);font-weight:600;font-size:13.5px}
+  table.mx td .sub{display:block;font-size:11px;color:var(--dim);font-weight:400;font-family:var(--mono)}
+  table.mx tr.us{background:linear-gradient(90deg,rgba(52,200,224,.08),rgba(61,220,132,.05))}
+  table.mx tr.us td:first-child{color:var(--ok)}
+  .yes{color:var(--ok)} .no{color:var(--theft)} .part{color:var(--tech)} .mut{color:var(--muted);font-family:var(--mono);font-size:12px}
+  .mk{font-family:var(--mono);font-weight:700}
+
+  /* positioning map */
+  .mapwrap{background:linear-gradient(180deg,#0c1418,#0a1013);border:1px solid var(--line2);border-radius:16px;padding:24px}
+  .mapwrap svg{width:100%;height:auto;display:block}
+  .maplg{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin-top:12px;font-size:12px;color:var(--muted)}
+  .maplg span{display:flex;align-items:center;gap:7px}.maplg i{width:11px;height:11px;border-radius:50%}
+
+  /* honest two-col */
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .hcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:22px}
+  .hcard.a{border-left:3px solid var(--tech)} .hcard.b{border-left:3px solid var(--ok)}
+  .hcard h3{font-size:16px;margin-bottom:12px}
+  .hcard ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+  .hcard li{font-size:13.5px;color:#c3d0d4;display:flex;gap:10px}
+  .hcard.a li::before{content:"→";color:var(--tech);font-family:var(--mono)}
+  .hcard.b li::before{content:"✓";color:var(--ok);font-family:var(--mono)}
+
+  /* synthesis */
+  .win{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px}
+  .wcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px}
+  .wcard .n{font-family:var(--mono);font-size:12px;color:var(--signal)}
+  .wcard h3{font-size:16px;margin:8px 0 6px}
+  .wcard p{font-size:13px;color:var(--muted);margin:0}
+  .bigline{font-size:clamp(20px,2.6vw,27px);font-weight:650;letter-spacing:-.015em;text-wrap:balance;max-width:40ch}
+  .bigline em{font-style:normal;color:var(--signal)}
+
+  .links{display:flex;gap:14px;flex-wrap:wrap;margin-top:26px}
+  .links a{border:1px solid var(--line2);border-radius:10px;padding:10px 16px;font-size:13px;color:#cdd8db}
+  .links a:hover{border-color:var(--signal-dim)}
+  .foot{border-top:1px solid var(--line);padding:26px 0;color:var(--dim);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  @media (max-width:900px){.cats,.win{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}}
+  @media (max-width:600px){.cats,.win{grid-template-columns:1fr}}
+</style>
+
+<header><div class="wrap hero">
+  <div class="eyebrow">Grid-Pulse NTL · Competitive Landscape</div>
+  <h1 style="margin-top:20px">Everyone measures loss.<br>Almost no one knows <em>why</em>.</h1>
+  <p class="sub">Utilities already fight electricity theft six different ways — from clipboards to billion-dollar smart-meter programmes. Here's an honest map of what exists, where each approach stops, and the gap Grid-Pulse was built to fill.</p>
+  <p class="note">Comparison is by category and positioning, using well-known vendors as representative examples — not a claim about any specific product's roadmap. Sources for the market figures are listed on the <a href="../business/index.html">business page</a>.</p>
+</div></header>
+
+<!-- 01 categories -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">01</span><div>
+    <h2>Six ways utilities fight theft today</h2>
+    <p class="kicker">Each has a real strength — and a structural gap that leaves theft hiding inside natural loss.</p>
+  </div></div>
+  <div class="cats">
+    <div class="cat"><div class="tag">Boots on the ground</div><h3>Manual field audits</h3><div class="ex">in-house crews · tip lines</div>
+      <div class="row s"><span class="lbl">+</span><span class="tx"><b>Ground truth</b> — an inspector confirms the hook.</span></div>
+      <div class="row g"><span class="lbl">–</span><span class="tx">Random, tip-driven, unrepeatable; labour-heavy and slow.</span></div></div>
+
+    <div class="cat"><div class="tag">Meter everyone</div><h3>Full AMI / smart meters</h3><div class="ex">Landis+Gyr · Itron · Honeywell · Sensus</div>
+      <div class="row s"><span class="lbl">+</span><span class="tx"><b>Per-customer billing</b> data; the long-term gold standard.</span></div>
+      <div class="row g"><span class="lbl">–</span><span class="tx">EGP 1,500–3,000 × <em>every</em> customer; years to roll out; the meter itself can be bypassed.</span></div></div>
+
+    <div class="cat"><div class="tag">Analytics on meter data</div><h3>AMI / MDM NTL analytics</h3><div class="ex">Bidgely · Awesense · Siemens EnergyIP · Oracle · C3 AI</div>
+      <div class="row s"><span class="lbl">+</span><span class="tx"><b>Powerful ML</b> on rich per-meter data.</span></div>
+      <div class="row g"><span class="lbl">–</span><span class="tx">Needs the AMI rollout to <em>exist first</em> — no smart meters, no input.</span></div></div>
+
+    <div class="cat"><div class="tag">Grid sensing</div><h3>LV grid / feeder monitoring</h3><div class="ex">DEPsys GridEye · Sensus · Schneider</div>
+      <div class="row s"><span class="lbl">+</span><span class="tx"><b>Real-time LV visibility</b> and power-quality data.</span></div>
+      <div class="row g"><span class="lbl">–</span><span class="tx">Built for grid ops, not theft attribution; pricey, and doesn't separate heat-loss from theft.</span></div></div>
+
+    <div class="cat"><div class="tag">Rules on SCADA</div><h3>Fixed-threshold loss alarms</h3><div class="ex">SCADA / spreadsheet loss reports</div>
+      <div class="row s"><span class="lbl">+</span><span class="tx"><b>Cheap</b>, uses data you already have.</span></div>
+      <div class="row g"><span class="lbl">–</span><span class="tx">Floods with false positives every hot day — so operators mute it.</span></div></div>
+
+    <div class="cat" style="border-color:#25505a;box-shadow:inset 0 0 0 1px rgba(52,200,224,.12)"><div class="tag" style="color:var(--signal)">Edge + AI · ours</div><h3>Grid-Pulse NTL</h3><div class="ex">transformer-level sensing + AI baseline</div>
+      <div class="row s"><span class="lbl">+</span><span class="tx"><b>Separates theft from natural loss</b>, explains why, on the legacy grid — one node per feeder.</span></div>
+      <div class="row s"><span class="lbl">+</span><span class="tx">Low CapEx, ROI &lt; 2 months, no AMI required.</span></div></div>
+  </div>
+</div></section>
+
+<!-- 02 matrix -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">02</span><div>
+    <h2>Head-to-head</h2>
+    <p class="kicker">The same criteria across every approach. The row that matters: can it tell theft from the natural loss that rises with heat and load — without metering every home?</p>
+  </div></div>
+  <div class="scroll"><table class="mx">
+    <thead><tr>
+      <th>Approach</th><th>Needs smart<br>meters?</th><th>Sensing<br>point</th><th>Separates theft<br>vs tech-loss</th><th>Explainable<br>leads</th><th>CapEx</th><th>Works on<br>legacy grid</th><th>Time to<br>value</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Manual field audits</td><td class="yes mk">No</td><td class="mut">the street</td><td class="no mk">✗</td><td class="part mk">partial</td><td class="mut">labour</td><td class="yes mk">✓</td><td class="mut">slow</td></tr>
+      <tr><td>Full AMI rollout</td><td class="mut">is the meter</td><td class="mut">each customer</td><td class="part mk">via analytics</td><td class="part mk">partial</td><td class="no mk">very high</td><td class="no mk">requires new</td><td class="no mk">years</td></tr>
+      <tr><td>AMI / MDM analytics</td><td class="no mk">Yes</td><td class="mut">meter data</td><td class="yes mk">✓</td><td class="yes mk">✓</td><td class="part mk">high*</td><td class="no mk">needs AMI</td><td class="part mk">medium</td></tr>
+      <tr><td>LV feeder monitoring</td><td class="yes mk">No</td><td class="mut">feeder</td><td class="no mk">✗</td><td class="no mk">✗</td><td class="part mk">high</td><td class="yes mk">✓</td><td class="part mk">medium</td></tr>
+      <tr><td>Fixed-threshold alarms</td><td class="yes mk">No</td><td class="mut">feeder / SCADA</td><td class="no mk">✗</td><td class="no mk">✗</td><td class="yes mk">low</td><td class="yes mk">✓</td><td class="yes mk">fast</td></tr>
+      <tr class="us"><td>Grid-Pulse NTL</td><td class="yes mk">No</td><td class="mut">transformer / LV busbar</td><td class="yes mk">✓ AI baseline</td><td class="yes mk">✓ reasons</td><td class="yes mk">low</td><td class="yes mk">✓</td><td class="yes mk">weeks</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">* AMI analytics is software-cheap but presupposes a smart-meter estate that costs billions to build. Grid-Pulse is the only row that is <b style="color:var(--ok)">low-CapEx, explainable, AND works on a grid that was never metered</b>.</p>
+</div></section>
+
+<!-- 03 positioning map -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">03</span><div>
+    <h2>The positioning map</h2>
+    <p class="kicker">Cost to deploy against theft intelligence — the ability to pinpoint <em>and explain</em> theft. The valuable, empty corner is low-cost + high-intelligence. That's us.</p>
+  </div></div>
+  <div class="mapwrap">
+    <svg viewBox="0 0 900 480" role="img" aria-label="2x2 positioning map: cost to deploy on the x-axis, theft intelligence on the y-axis. Grid-Pulse sits in the low-cost, high-intelligence corner.">
+      <!-- sweet-spot highlight (top-left) -->
+      <rect x="70" y="50" width="200" height="150" fill="rgba(52,200,224,0.07)"/>
+      <text x="80" y="72" fill="#34c8e0" font-size="12" font-family="monospace" letter-spacing="1">THE WHITESPACE</text>
+      <text x="80" y="88" fill="#5f7178" font-size="11" font-family="monospace">low cost · high intelligence</text>
+      <!-- axes -->
+      <line x1="70" y1="430" x2="850" y2="430" stroke="#2a3a41" stroke-width="1.5"/>
+      <line x1="70" y1="50" x2="70" y2="430" stroke="#2a3a41" stroke-width="1.5"/>
+      <text x="460" y="466" fill="#8a9ba1" font-size="13" font-family="monospace" text-anchor="middle">Cost to deploy  →</text>
+      <text x="40" y="240" fill="#8a9ba1" font-size="13" font-family="monospace" text-anchor="middle" transform="rotate(-90 40 240)">Theft intelligence  →</text>
+      <!-- gridlines -->
+      <line x1="270" y1="50" x2="270" y2="430" stroke="#161f24" stroke-dasharray="3 5"/>
+      <line x1="560" y1="50" x2="560" y2="430" stroke="#161f24" stroke-dasharray="3 5"/>
+      <line x1="70" y1="200" x2="850" y2="200" stroke="#161f24" stroke-dasharray="3 5"/>
+      <!-- competitor dots -->
+      <g font-family="system-ui" font-size="12.5">
+        <!-- fixed threshold: low cost, low intelligence -->
+        <circle cx="150" cy="360" r="8" fill="#5f7178"/><text x="164" y="364" fill="#c3d0d4">Fixed-threshold alarms</text>
+        <!-- manual audits: mid-low cost, low-mid intelligence -->
+        <circle cx="250" cy="320" r="8" fill="#5f7178"/><text x="264" y="324" fill="#c3d0d4">Manual field audits</text>
+        <!-- LV monitoring: high cost, mid intelligence -->
+        <circle cx="620" cy="255" r="8" fill="#f4a63b"/><text x="500" y="240" fill="#c3d0d4" text-anchor="end">LV feeder monitoring</text>
+        <!-- AMI analytics: high cost (needs AMI), high intelligence -->
+        <circle cx="700" cy="120" r="8" fill="#f4a63b"/><text x="716" y="124" fill="#c3d0d4">AMI / MDM analytics</text>
+        <!-- full AMI: very high cost, high intelligence, slow -->
+        <circle cx="810" cy="150" r="8" fill="#ff4d5e"/><text x="800" y="176" fill="#c3d0d4" text-anchor="end">Full AMI rollout</text>
+        <!-- us: low-mid cost, high intelligence -->
+        <circle cx="175" cy="110" r="11" fill="#34c8e0" stroke="#0a0e0f" stroke-width="2"/>
+        <circle cx="175" cy="110" r="18" fill="none" stroke="#34c8e0" stroke-opacity="0.4"/>
+        <text x="200" y="106" fill="#e8eef0" font-weight="700">Grid-Pulse NTL</text>
+        <text x="200" y="123" fill="#3ddc84" font-size="11" font-family="monospace">low CapEx · explainable · no AMI</text>
+      </g>
+    </svg>
+    <div class="maplg">
+      <span><i style="background:#34c8e0"></i>Grid-Pulse (whitespace)</span>
+      <span><i style="background:#f4a63b"></i>Capable but capital-heavy</span>
+      <span><i style="background:#ff4d5e"></i>Highest CapEx / slowest</span>
+      <span><i style="background:#5f7178"></i>Cheap but blind to cause</span>
+    </div>
+  </div>
+</div></section>
+
+<!-- 04 honest -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">04</span><div>
+    <h2>Where we're honest</h2>
+    <p class="kicker">No tool wins on every axis. Here's what the incumbents genuinely do better — and why we complement them rather than pretend to replace everything.</p>
+  </div></div>
+  <div class="two">
+    <div class="hcard a"><h3>What AMI &amp; incumbents do better</h3><ul>
+      <li>Per-customer billing data at the meter — we localize to the feeder/transformer, not the exact household.</li>
+      <li>Mature, standards-certified revenue metering and vendor support at national scale.</li>
+      <li>Rich historical datasets where AMI is already deployed (mostly US / EU).</li>
+    </ul></div>
+    <div class="hcard b"><h3>How Grid-Pulse complements them</h3><ul>
+      <li>Runs <b>today</b> on grids that were never metered — no rollout to wait for.</li>
+      <li>One node covers a whole feeder of customers — a fraction of per-meter CapEx.</li>
+      <li>Narrows theft to a transformer + explains why, so inspectors and AMI both aim better.</li>
+      <li>Sits alongside AMI as the theft-attribution layer where meter data alone is noisy.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<!-- 05 synthesis -->
+<section class="pad"><div class="wrap">
+  <div class="shead"><span class="snum">05</span><div>
+    <h2>The whitespace we own</h2>
+  </div></div>
+  <p class="bigline">Grid-Pulse is the only approach that is <em>low-cost</em>, <em>explainable</em>, and works on the grid as it exists today — no billion-dollar meter rollout required.</p>
+  <div class="win">
+    <div class="wcard"><div class="n">01</div><h3>The AI baseline</h3><p>Predicting normal loss for the current heat and load is what kills the false positives every cheaper tool drowns in.</p></div>
+    <div class="wcard"><div class="n">02</div><h3>No AMI prerequisite</h3><p>We instrument the transformer, not every home — so we deploy in weeks on grids that will never be fully metered.</p></div>
+    <div class="wcard"><div class="n">03</div><h3>The compounding data moat</h3><p>Every explained verdict adds labelled theft data. A fixed-threshold competitor can copy a rule; it can't copy the dataset.</p></div>
+  </div>
+  <div class="links">
+    <a href="../business/index.html">← Business &amp; financials</a>
+    <a href="../pitch/index.html">The pitch</a>
+    <a href="../deployment/index.html">Field deployment →</a>
+  </div>
+</div></section>
+
+<div class="wrap foot">
+  <span>Grid-Pulse NTL — Competitive Landscape · category positioning, representative vendors</span>
+  <span class="mono">low-CapEx · explainable · no-AMI</span>
+</div>

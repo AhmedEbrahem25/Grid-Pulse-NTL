@@ -23,7 +23,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 
-from . import store
+from . import alerts, db, store
 from .config import settings
 from .contract import EdgePayload, MeterReading
 from .detection.decision import run_detection
@@ -43,6 +43,9 @@ def require_ingest_token(authorization: Optional[str] = Header(default=None)) ->
 @app.on_event("startup")
 async def _startup() -> None:
     store.seed()
+    store.load_persisted()          # restore verdicts/history from the DB (A1)
+    if settings.auto_stream:
+        asyncio.create_task(_auto_stream())     # keep the console alive (A3)
     if not settings.inline_detection:
         asyncio.create_task(_verdict_subscriber())
 
@@ -63,9 +66,36 @@ async def _verdict_subscriber() -> None:
         print(f"[verdict_subscriber] disabled: {e}")
 
 
+async def _auto_stream() -> None:
+    """Gentle background telemetry so the console is alive with no clicking (A3).
+
+    Round-robins the fleet; skips any transformer with a *recent* injected
+    theft/technical verdict so a demo beat stays on screen. Injected beats always win.
+    """
+    import random
+    await asyncio.sleep(2.0)
+    i = 0
+    while True:
+        try:
+            ids = list(store.transformers.keys())
+            if ids:
+                tid = ids[i % len(ids)]
+                i += 1
+                lv = store.latest_verdict(tid)
+                held = (lv and lv.get("label") != "NORMAL"
+                        and int(time.time()) - int(lv.get("created_at", 0)) < 25)
+                if not held:
+                    store.set_registered_load(tid, BASE_REGISTERED_W)
+                    await process_reading(_auto_payload(tid, BASE_REGISTERED_W + random.uniform(-40, 120)))
+        except Exception:
+            pass
+        await asyncio.sleep(settings.auto_stream_interval_s)
+
+
 # ---------- core processing ----------
 async def _emit_verdict(verdict: dict) -> dict:
     verdict = store.add_verdict(verdict)
+    alerts.notify_theft(verdict)     # fire-and-forget webhook/Telegram on theft (A4)
     await ws_manager.broadcast({"type": "verdict", "payload": verdict})
     await ws_manager.broadcast({"type": "transformer_status",
                                 "payload": {"transformer_id": verdict["transformer_id"],
@@ -139,6 +169,14 @@ async def transformer_detail(tid: str):
     }
 
 
+@app.get("/transformers/{tid}/history")
+async def transformer_history(tid: str, hours: float = 24.0):
+    """Persisted loss/verdict + load series (A1) — survives restarts."""
+    if tid not in store.transformers:
+        raise HTTPException(status_code=404, detail="unknown transformer")
+    return db.history(tid, hours)
+
+
 @app.get("/verdicts")
 async def verdicts(label: Optional[str] = None, severity: Optional[str] = None,
                    status: Optional[str] = None):
@@ -166,38 +204,62 @@ async def set_status(vid: str, body: dict):
 
 # ---------- demo scenarios (run a beat end-to-end without hardware) ----------
 BASE_REGISTERED_W = 6800.0
+INDUSTRIAL_REGISTERED_W = 8800.0     # a *registered* factory — metered, so the balance holds
 _seq = {"n": 5000}
 
+# representative current-harmonic signatures (fed to the 1D-CNN classifier)
+_H_NORMAL = [{"h": 3, "mag_pct": 2.0}, {"h": 5, "mag_pct": 2.5}]
+_H_ILLEGAL = [{"h": 2, "mag_pct": 4.0}, {"h": 3, "mag_pct": 18.0}, {"h": 4, "mag_pct": 4.0},
+              {"h": 5, "mag_pct": 20.0}, {"h": 7, "mag_pct": 13.0}, {"h": 9, "mag_pct": 8.0},
+              {"h": 11, "mag_pct": 6.0}, {"h": 13, "mag_pct": 5.0}]  # broad distortion = illegal fingerprint
+_H_LEGIT = [{"h": 5, "mag_pct": 14.0}, {"h": 7, "mag_pct": 8.0}, {"h": 11, "mag_pct": 4.0}, {"h": 13, "mag_pct": 3.0}]
 
-def _scenario_payload(tid: str, scenario: str) -> EdgePayload:
+# scenario: (total_w, power_factor, thd_pct, temp_c, harmonics[])
+PRESETS = {
+    "normal":     (6850.0, 0.98, 4.0, 27.0, _H_NORMAL),
+    "technical":  (7000.0, 0.97, 5.0, 45.0, _H_NORMAL),    # hot day: AI baseline rises, no alarm
+    "theft":      (10200.0, 0.66, 22.0, 27.0, _H_ILLEGAL),  # brazen unregistered hook: PF collapses, illegal signature
+    "industrial": (8800.0, 0.93, 20.0, 27.0, _H_LEGIT),    # registered factory: high THD but legit signature -> no alarm
+}
+
+
+def _build_payload(tid, total, pf, thd, temp, harmonics=None) -> EdgePayload:
     _seq["n"] += 1
-    presets = {
-        # scenario: (total_w, power_factor, thd, temp_c)
-        "normal":    (6850.0, 0.98, 4.0, 27.0),
-        "technical": (7000.0, 0.97, 5.0, 45.0),   # hot day: baseline rises, no alarm
-        "theft":     (10200.0, 0.66, 22.0, 27.0),  # brazen unregistered ~3.4 kW hook: PF collapses, THD spikes
-    }
-    total, pf, thd, temp = presets.get(scenario, presets["normal"])
+    phase = {"phase": "single", "i_rms_a": round(total / 230, 1),
+             "v_rms_v": 230.0, "p_active_w": total,
+             "s_apparent_va": round(total / max(pf, 0.01), 1),
+             "power_factor": pf, "freq_hz": 49.98, "thd_i_pct": thd}
+    if harmonics:
+        phase["harmonics"] = harmonics
     return EdgePayload(
         schema_version="1.0", device_id="GP-EDGE-SIM001", firmware="1.0.0",
         ts=int(time.time()), seq=_seq["n"],
         site={"transformer_id": tid, "feeder_id": "F-03", "lat": 31.1107, "lng": 30.9388},
         measurement={"window_ms": 1000, "energy_wh_interval": round(total / 3600, 3),
-                     "phases": [{"phase": "single", "i_rms_a": round(total / 230, 1),
-                                 "v_rms_v": 230.0, "p_active_w": total,
-                                 "s_apparent_va": round(total / max(pf, 0.01), 1),
-                                 "power_factor": pf, "freq_hz": 49.98, "thd_i_pct": thd}]},
+                     "phases": [phase]},
         env={"temp_c": temp, "humidity_pct": 50.0},
     )
+
+
+def _scenario_payload(tid: str, scenario: str) -> EdgePayload:
+    total, pf, thd, temp, harm = PRESETS.get(scenario, PRESETS["normal"])
+    return _build_payload(tid, total, pf, thd, temp, harm)
+
+
+def _auto_payload(tid: str, total: float) -> EdgePayload:
+    import random
+    return _build_payload(tid, total, round(random.uniform(0.96, 0.99), 3),
+                          round(random.uniform(3, 6), 1), round(random.uniform(26, 30), 1), _H_NORMAL)
 
 
 @app.post("/sim/scenario")
 async def sim_scenario(body: dict):
     tid = body.get("transformer_id", "TX-KFS-0456")
     scenario = body.get("scenario", "normal")
-    if scenario not in {"normal", "technical", "theft"}:
-        raise HTTPException(status_code=422, detail="scenario must be normal|technical|theft")
-    store.set_registered_load(tid, BASE_REGISTERED_W)
+    if scenario not in PRESETS:
+        raise HTTPException(status_code=422, detail="scenario must be normal|technical|theft|industrial")
+    reg = INDUSTRIAL_REGISTERED_W if scenario == "industrial" else BASE_REGISTERED_W
+    store.set_registered_load(tid, reg)
     verdict = await process_reading(_scenario_payload(tid, scenario))
     return {"ok": True, "verdict": verdict}
 

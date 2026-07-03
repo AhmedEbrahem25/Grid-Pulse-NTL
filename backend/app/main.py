@@ -22,6 +22,7 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import alerts, db, store
 from .config import settings
@@ -177,6 +178,31 @@ async def transformer_history(tid: str, hours: float = 24.0):
     return db.history(tid, hours)
 
 
+@app.get("/leads")
+async def leads():
+    """Inspection Queue — theft-suspected transformers ranked for field dispatch."""
+    out = []
+    for t in store.list_transformers():
+        v = t.get("latest_verdict")
+        if v and v.get("label") == "NTL_THEFT_SUSPECTED":
+            out.append({"transformer_id": t["id"], "name": t.get("name", t["id"]),
+                        "theft_probability": v.get("theft_probability", 0),
+                        "severity": v.get("severity"),
+                        "theft_estimate_w": v.get("theft_estimate_w", 0),
+                        "status": v.get("status", "open"), "ts": v.get("created_at")})
+    out.sort(key=lambda x: (x["theft_probability"], x["theft_estimate_w"]), reverse=True)
+    return out
+
+
+@app.post("/sim/reset")
+async def sim_reset():
+    """Reset Demo — clear runtime + persisted state for a clean start (keeps transformers)."""
+    store.reset()
+    db.clear()
+    await ws_manager.broadcast({"type": "reset"})
+    return {"ok": True}
+
+
 @app.get("/verdicts")
 async def verdicts(label: Optional[str] = None, severity: Optional[str] = None,
                    status: Optional[str] = None):
@@ -276,12 +302,22 @@ async def ws_stream(ws: WebSocket):
 
 
 # ---------- dashboard ----------
-def _dashboard_file() -> Optional[str]:
-    for p in ("/app/dashboard/index.html",
-              os.path.join(os.path.dirname(__file__), "..", "..", "dashboard", "index.html")):
-        if os.path.exists(p):
+def _dashboard_dir() -> Optional[str]:
+    for p in ("/app/dashboard", os.path.join(os.path.dirname(__file__), "..", "..", "dashboard")):
+        if os.path.isdir(p):
             return os.path.abspath(p)
     return None
+
+
+def _dashboard_file() -> Optional[str]:
+    d = _dashboard_dir()
+    return os.path.join(d, "index.html") if d and os.path.exists(os.path.join(d, "index.html")) else None
+
+
+# Serve dashboard static assets (vendored Leaflet -> offline map) at /dash/*
+_dd = _dashboard_dir()
+if _dd:
+    app.mount("/dash", StaticFiles(directory=_dd), name="dash")
 
 
 @app.get("/")

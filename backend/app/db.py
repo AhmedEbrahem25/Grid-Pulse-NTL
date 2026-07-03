@@ -123,6 +123,21 @@ def save_reading(transformer_id: str, r: dict) -> None:
         pass
 
 
+def clear() -> None:
+    """Truncate persisted verdicts + readings (Reset Demo). No-op if unavailable."""
+    if not _ok:
+        return
+    try:
+        with Session(_engine) as s:
+            for row in s.exec(select(VerdictRow)).all():
+                s.delete(row)
+            for row in s.exec(select(ReadingRow)).all():
+                s.delete(row)
+            s.commit()
+    except Exception:
+        pass
+
+
 def history(transformer_id: str, hours: float = 24.0) -> dict:
     """Loss/verdict + load series for GET /transformers/{id}/history."""
     if not _ok:

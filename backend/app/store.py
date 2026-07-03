@@ -57,6 +57,14 @@ def seed() -> None:
         registered_load_w[tid] = 0.0
 
 
+def reset() -> None:
+    """Clear all runtime state for a clean demo (keeps the seeded transformers)."""
+    with _lock:
+        verdicts.clear()
+        readings.clear()
+        registered_load_w.clear()
+
+
 def set_registered_load(transformer_id: str, watts: float) -> None:
     with _lock:
         registered_load_w[transformer_id] = max(0.0, watts)

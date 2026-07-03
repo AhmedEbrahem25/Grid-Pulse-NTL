@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Grid-Pulse NTL — Theft Watch</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/dash/vendor/leaflet.css" />
 <style>
   :root{
     --bg:#0a0b0e; --panel:#111318; --panel2:#161922; --border:#232733;
@@ -137,6 +137,29 @@
   .acct-row.hl b{color:var(--accent)}
   .acct-contrib{margin-top:11px;font-size:13px;font-weight:600}
   .acct-reason{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+  /* header reset button */
+  .hdr-reset{margin-left:12px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+    border-radius:9px;padding:7px 12px;font-size:12.5px;cursor:pointer;transition:border-color .15s,color .15s}
+  .hdr-reset:hover{border-color:var(--bad);color:var(--text)}
+  .hdr-reset:active{transform:translateY(1px)}
+  /* inspection queue */
+  #queue-card{margin-bottom:14px}
+  #queue{display:flex;flex-direction:column;gap:6px}
+  .qrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);
+    border-left:3px solid var(--bad);border-radius:9px;background:var(--panel);cursor:pointer;transition:border-color .15s}
+  .qrow:hover{border-color:#33405a}
+  .qrow .qn{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .qrow .qf{font-size:10.5px;color:var(--muted);margin-top:1px}
+  .qrow .qp{font-size:16px;font-weight:700;color:var(--bad);text-align:right}
+  .qrow .qk{font-size:10px;color:var(--muted);text-align:right}
+  /* history legend */
+  .histlg{display:flex;gap:12px;margin-top:8px;font-size:10.5px;color:var(--muted)}
+  .histlg span{display:flex;align-items:center;gap:5px} .histlg i{width:8px;height:8px;border-radius:50%;display:inline-block}
+  /* offline map */
+  #map.offline{background:#0b1016!important}
+  #map.offline .leaflet-tile-pane{display:none}
+  .map-offline-badge{position:absolute;bottom:12px;right:12px;z-index:600;background:rgba(245,158,11,.14);
+    border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:6px 10px;font-size:11px;font-family:var(--mono)}
   a{color:var(--accent)}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   @media (max-width:1100px){main{grid-template-columns:1fr}.col.left,.col.right{display:none}}
@@ -151,11 +174,16 @@
     <div class="kpi"><b id="k-threat" style="color:var(--bad)">0</b><span>Under threat</span></div>
     <div class="kpi"><b id="k-theft" class="mono">0.0</b><span>kW at risk</span></div>
   </div>
+  <button class="hdr-reset" onclick="resetDemo()" title="Clear all verdicts for a fresh demo">⟳ Reset</button>
 </header>
 
 <main>
-  <!-- left: transformer list -->
+  <!-- left: inspection queue + transformer list -->
   <section class="col left">
+    <div class="card" id="queue-card">
+      <h2>Inspection Queue <span class="cnt mono" id="q-count"></span></h2>
+      <div id="queue"><div class="empty">No active leads — grid clear.</div></div>
+    </div>
     <h2>Transformers <span class="cnt mono" id="tx-count"></span></h2>
     <div class="txlist" id="txlist"></div>
   </section>
@@ -210,6 +238,12 @@
       <div class="acct-contrib" id="acct-contrib"></div>
       <div class="acct-reason" id="acct-reason"></div>
     </div>
+    <div class="card" id="hist-card" hidden>
+      <h2>Loss history <span class="cnt mono">24 h · persisted</span></h2>
+      <svg id="histchart" viewBox="0 0 320 74" preserveAspectRatio="none" style="width:100%;height:74px;display:block"></svg>
+      <div id="hist-empty" class="empty" style="padding:8px 0 0">Building history…</div>
+      <div class="histlg" id="hist-legend"></div>
+    </div>
     <div class="card">
       <h2>Verdict feed</h2>
       <div class="feed" id="feed"><div class="empty">No events yet.</div></div>
@@ -217,7 +251,7 @@
   </section>
 </main>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/dash/vendor/leaflet.js"></script>
 <script>
 const API = location.origin;
 const clsFor = l => l==="NTL_THEFT_SUSPECTED" ? "bad" : l==="TECHNICAL_LOSS" ? "warn" : "ok";
@@ -227,7 +261,18 @@ const kW = w => (w/1000).toFixed(2)+" kW";
 let transformers=[], markers={}, selected=null, latest={}, series={}, lastVerdictId={};
 
 const map = L.map('map',{zoomControl:true,attributionControl:false}).setView([31.111,30.939],13);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+const tiles=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19});
+tiles.addTo(map);
+// Offline map: if street tiles can't load (no internet at the venue), fall back to a
+// dark backdrop — the vendored Leaflet still projects the transformer markers.
+let offlineShown=false;
+function goOffline(){ if(offlineShown)return; offlineShown=true;
+  document.getElementById('map').classList.add('offline');
+  const b=document.createElement('div'); b.className='map-offline-badge'; b.textContent='◍ offline · positions only';
+  const mw=document.querySelector('.mapwrap'); if(mw) mw.appendChild(b);
+  setTimeout(()=>map.invalidateSize(),50);
+}
+tiles.on('tileerror', goOffline);
 const legend=L.control({position:'bottomleft'});
 legend.onAdd=()=>{ const d=L.DomUtil.create('div','legend');
   d.innerHTML=`<span><i style="background:${COLOR.ok}"></i>Normal</span>
@@ -307,12 +352,14 @@ function select(id){
   if(t&&t.lat!=null) map.panTo([t.lat,t.lng]);
   if(latest[id]) showVerdict(latest[id]); else clearVerdict(t);
   drawSpark();
+  renderHistory(id);
 }
 function clearVerdict(t){
   document.getElementById('verdict').className='card';
   document.getElementById('verdict-empty').hidden=false;
   document.getElementById('verdict-body').hidden=true;
   document.getElementById('acct-card').hidden=true;
+  document.getElementById('hist-card').hidden=true;
 }
 
 /* ---------- verdict handling ---------- */
@@ -328,6 +375,61 @@ function recountKPIs(){
   document.getElementById('k-clear').textContent=clear;
   document.getElementById('k-threat').textContent=threats.length;
   document.getElementById('k-theft').textContent=(threats.reduce((s,x)=>s+(x.theft_estimate_w||0),0)/1000).toFixed(1);
+  renderQueue();
+}
+/* ---------- inspection queue ---------- */
+function renderQueue(){
+  const q=document.getElementById('queue');
+  const leads=Object.values(latest).filter(v=>v.label==='NTL_THEFT_SUSPECTED')
+    .sort((a,b)=>(b.theft_probability-a.theft_probability)||((b.theft_estimate_w||0)-(a.theft_estimate_w||0)));
+  document.getElementById('q-count').textContent=leads.length||'';
+  if(!leads.length){ q.innerHTML='<div class="empty">No active leads — grid clear.</div>'; return; }
+  q.innerHTML='';
+  leads.forEach(v=>{
+    const t=transformers.find(x=>x.id===v.transformer_id)||{name:v.transformer_id};
+    const d=document.createElement('div'); d.className='qrow'; d.onclick=()=>select(v.transformer_id);
+    d.innerHTML=`<div><div class="qn">${t.name}</div><div class="qf mono">${v.transformer_id} · ${v.severity||''}</div></div>
+                 <div><div class="qp">${v.theft_probability}%</div><div class="qk mono">${((v.theft_estimate_w||0)/1000).toFixed(2)} kW</div></div>`;
+    q.appendChild(d);
+  });
+}
+/* ---------- loss history (24h, persisted) ---------- */
+async function renderHistory(id){
+  const card=document.getElementById('hist-card'), svg=document.getElementById('histchart'),
+        empty=document.getElementById('hist-empty'), lg=document.getElementById('hist-legend');
+  card.hidden=false;
+  try{
+    const h=await (await fetch(API+'/transformers/'+id+'/history?hours=24')).json();
+    const vs=(h.verdicts||[]);
+    if(vs.length<2){ svg.innerHTML=''; empty.hidden=false; lg.innerHTML=''; return; }
+    empty.hidden=true;
+    const w=320,H=74,pad=7;
+    const xs=vs.map(v=>v.ts), ys=vs.map(v=>v.measured_loss_w||0);
+    const mnx=Math.min(...xs),rngx=(Math.max(...xs)-mnx)||1;
+    const mny=Math.min(...ys),rngy=(Math.max(...ys)-mny)||1;
+    const X=t=>((t-mnx)/rngx)*w, Y=v=>H-pad-((v-mny)/rngy)*(H-2*pad);
+    const line='M'+vs.map(v=>`${X(v.ts).toFixed(1)},${Y(v.measured_loss_w||0).toFixed(1)}`).join(' L');
+    const col={NTL_THEFT_SUSPECTED:'#fb3b57',TECHNICAL_LOSS:'#f59e0b',NORMAL:'#34d399'};
+    const dots=vs.map(v=>`<circle cx="${X(v.ts).toFixed(1)}" cy="${Y(v.measured_loss_w||0).toFixed(1)}" r="${v.label==='NTL_THEFT_SUSPECTED'?3.2:1.9}" fill="${col[v.label]||'#38bdf8'}"/>`).join('');
+    svg.innerHTML=`<defs><linearGradient id="hg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#38bdf8" stop-opacity=".22"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></linearGradient></defs>
+      <path d="${line} L${w},${H} L0,${H} Z" fill="url(#hg)"/><path d="${line}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-linejoin="round"/>${dots}`;
+    lg.innerHTML=`<span><i style="background:#34d399"></i>normal</span><span><i style="background:#f59e0b"></i>technical</span><span><i style="background:#fb3b57"></i>theft</span><span>· ${vs.length} events</span>`;
+  }catch(e){ svg.innerHTML=''; empty.hidden=false; }
+}
+/* ---------- reset demo ---------- */
+async function resetDemo(){
+  if(!window.confirm('Reset the demo? This clears all verdicts and history for a fresh run.')) return;
+  try{ await fetch(API+'/sim/reset',{method:'POST'}); }catch(e){}
+  clearAll();
+}
+function clearAll(){
+  latest={}; series={}; lastVerdictId={};
+  document.getElementById('feed').innerHTML='<div class="empty">No events yet.</div>';
+  transformers.forEach(t=>{ if(markers[t.id]) markers[t.id].setIcon(iconFor(t)); });
+  renderList(); recountKPIs();
+  document.getElementById('acct-card').hidden=true;
+  document.getElementById('hist-card').hidden=true;
+  if(selected){ const t=transformers.find(x=>x.id===selected); if(t) clearVerdict(t); drawSpark(); }
 }
 function applyVerdict(v,animate){
   refreshTransformer(v);
@@ -439,6 +541,7 @@ function connectWS(){
     ws.onmessage=e=>{ const {type,payload}=JSON.parse(e.data);
       if(type==='verdict') applyVerdict(payload,true);
       else if(type==='edge_reading') pushReading(payload);
+      else if(type==='reset') clearAll();
     };
   }catch(e){ setConn(false); startPolling(); }
 }

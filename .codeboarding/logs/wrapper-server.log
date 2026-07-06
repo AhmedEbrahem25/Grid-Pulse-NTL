@@ -1,14 +1,14 @@
-[stderr] INFO:     Started server process [19716]
+[stderr] INFO:     Started server process [28472]
 [stderr] INFO:     Waiting for application startup.
 [stderr] INFO:     Application startup complete.
 [stderr] INFO:     Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)
-INFO:     127.0.0.1:7785 - "GET /health HTTP/1.1" 200 OK
-[stderr] INFO:     ('127.0.0.1', 7789) - "WebSocket /ws" [accepted]
-[stderr] 2026-07-06 20:11:07 INFO     [codeboarding_pro.ws.server:258] WebSocket connected: session cc52c65c-c79b-4c78-8380-d5cbaa04f3ee
+INFO:     127.0.0.1:11863 - "GET /health HTTP/1.1" 200 OK
+[stderr] INFO:     ('127.0.0.1', 11864) - "WebSocket /ws" [accepted]
+[stderr] 2026-07-07 00:34:58 INFO     [codeboarding_pro.ws.server:258] WebSocket connected: session 03168864-73d1-4ce2-aff4-fd121d95f8c5
 [stderr] INFO:     connection open
-[stderr] 2026-07-06 20:11:07 INFO     [codeboarding_pro.lsp.bootstrap:56] LSP startup attempt 1/3
-[stderr] 2026-07-06 20:11:07 INFO     [codeboarding_pro.session:187] Session cc52c65c-c79b-4c78-8380-d5cbaa04f3ee initialized: repo=F:\project\Hackathon Kafrelsha5, project=Hackathon Kafrelsha5, output=F:\project\Hackathon Kafrelsha5\.codeboarding
-[stderr] 2026-07-06 20:11:08 WARNING  [codeboarding_pro.lsp.bootstrap:72] LSP startup attempt 1 failed: [WinError 193] %1 is not a valid Win32 application
+[stderr] 2026-07-07 00:34:59 INFO     [codeboarding_pro.lsp.bootstrap:56] LSP startup attempt 1/3
+[stderr] 2026-07-07 00:34:59 INFO     [codeboarding_pro.session:187] Session 03168864-73d1-4ce2-aff4-fd121d95f8c5 initialized: repo=F:\project\Hackathon Kafrelsha5, project=Hackathon Kafrelsha5, output=F:\project\Hackathon Kafrelsha5\.codeboarding
+[stderr] 2026-07-07 00:34:59 WARNING  [codeboarding_pro.lsp.bootstrap:72] LSP startup attempt 1 failed: [WinError 193] %1 is not a valid Win32 application
 [stderr] Traceback (most recent call last):
 [stderr]   File "codeboarding_pro\lsp\bootstrap.py", line 57, in _run
 [stderr]   File "static_analyzer\__init__.py", line 175, in __init__
@@ -17,8 +17,8 @@ INFO:     127.0.0.1:7785 - "GET /health HTTP/1.1" 200 OK
 [stderr]   File "subprocess.py", line 1026, in __init__
 [stderr]   File "subprocess.py", line 1538, in _execute_child
 [stderr] OSError: [WinError 193] %1 is not a valid Win32 application
-[stderr] 2026-07-06 20:11:11 INFO     [codeboarding_pro.lsp.bootstrap:56] LSP startup attempt 2/3
-[stderr] 2026-07-06 20:11:11 WARNING  [codeboarding_pro.lsp.bootstrap:72] LSP startup attempt 2 failed: [WinError 193] %1 is not a valid Win32 application
+[stderr] 2026-07-07 00:35:02 INFO     [codeboarding_pro.lsp.bootstrap:56] LSP startup attempt 2/3
+[stderr] 2026-07-07 00:35:02 WARNING  [codeboarding_pro.lsp.bootstrap:72] LSP startup attempt 2 failed: [WinError 193] %1 is not a valid Win32 application
 [stderr] Traceback (most recent call last):
 [stderr]   File "codeboarding_pro\lsp\bootstrap.py", line 57, in _run
 [stderr]   File "static_analyzer\__init__.py", line 175, in __init__
@@ -27,8 +27,8 @@ INFO:     127.0.0.1:7785 - "GET /health HTTP/1.1" 200 OK
 [stderr]   File "subprocess.py", line 1026, in __init__
 [stderr]   File "subprocess.py", line 1538, in _execute_child
 [stderr] OSError: [WinError 193] %1 is not a valid Win32 application
-[stderr] 2026-07-06 20:11:14 INFO     [codeboarding_pro.lsp.bootstrap:56] LSP startup attempt 3/3
-[stderr] 2026-07-06 20:11:14 WARNING  [codeboarding_pro.lsp.bootstrap:72] LSP startup attempt 3 failed: [WinError 193] %1 is not a valid Win32 application
+[stderr] 2026-07-07 00:35:05 INFO     [codeboarding_pro.lsp.bootstrap:56] LSP startup attempt 3/3
+[stderr] 2026-07-07 00:35:05 WARNING  [codeboarding_pro.lsp.bootstrap:72] LSP startup attempt 3 failed: [WinError 193] %1 is not a valid Win32 application
 [stderr] Traceback (most recent call last):
 [stderr]   File "codeboarding_pro\lsp\bootstrap.py", line 57, in _run
 [stderr]   File "static_analyzer\__init__.py", line 175, in __init__

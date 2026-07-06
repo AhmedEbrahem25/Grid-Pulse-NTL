@@ -33,7 +33,7 @@
 - [The problem](#-the-problem)
 - [The solution](#-the-solution)
 - [Quickstart](#-quickstart-demo-in-2-minutes)
-- [The three‑beat demo](#-the-three-beat-demo)
+- [The four‑beat demo](#-the-four-beat-demo)
 - [Architecture](#-architecture)
 - [How detection works](#-how-detection-works)
 - [The model is multi‑factor](#-the-model-is-multi-factor)
@@ -78,19 +78,23 @@ python ml/train.py                # optional — the physics fallback works with
 ```
 
 Open **http://localhost:8000**, pick a transformer, and drive the demo bar. No hardware required.
-For a live telemetry stream: `python simulator/simulate.py`.
+The console is **live on open** — a gentle background stream keeps it breathing (`AUTO_STREAM`), and injected beats take priority.
+For a manual telemetry stream: `python simulator/simulate.py`.
 To run on real hardware, flash [`firmware/esp32_edge_node`](firmware/esp32_edge_node/README.md).
+
+📖 **Running the demo on stage?** [`DEMO.md`](DEMO.md) is the full click‑by‑click walkthrough — every command, button, expected result, and fallback.
 
 <br/>
 
-## 🎬 The three‑beat demo
+## 🎬 The four‑beat demo
 
-This *is* the product. Three buttons, three verdicts — replay them in any order, any number of times (the demo is replay‑safe).
+This *is* the product. Four buttons, four verdicts — replay them in any order, any number of times (the demo is replay‑safe).
 
 | Button | Injected | Verdict on screen | Why it lands |
 |---|---|---|---|
 | **Normal load** | registered lamp only | `NORMAL` — energy balance holds | baseline sanity |
 | **Hot day (technical)** | temperature rises | `TECHNICAL LOSS` — **AI baseline rises to match, no alarm** | 🏆 the false‑positive killer — judges lean in here |
+| **Legit industrial** | a *registered* high‑THD factory | `NORMAL / technical` — **not** flagged as theft | the 1D‑CNN knows a real factory from a hook |
 | **Inject theft** | hair‑dryer on an *unregistered* outlet | `THEFT` — screen turns **red**, **Theft Probability 94%**, ✓ 5/5 reasons, ~3.1 kW estimated | the payoff |
 
 <br/>
@@ -120,6 +124,8 @@ The **edge does the DSP** (RMS, power factor, FFT/THD) so we ship *features*, no
 | Workers | **Celery** | async AI inference — real microservices story |
 | AI | **scikit‑learn** (RandomForest regressor + IsolationForest) **+ PyTorch 1D‑CNN** (harmonic classifier) | trains in seconds/minutes on physics‑seeded synthetic data; CNN degrades to a rule if torch is absent |
 | Realtime | **FastAPI WebSocket** (+ poll fallback) | live red alert on stage |
+| Persistence | **SQLModel → SQLite** (Postgres‑ready) | verdicts + history survive restarts; no‑op if absent |
+| Alerts | **webhook / Telegram** (best‑effort) | push theft leads to the field; optional |
 | Dashboard | **single‑file** served by FastAPI | demo‑simple |
 | Deploy | **docker‑compose up** | one command on stage |
 
@@ -220,7 +226,7 @@ Every verdict ships a **Theft Probability %** and a **reasons checklist** — no
 
 ## 🔌 API surface
 
-Canonical contract lives in [`contracts/edge_telemetry.schema.json`](contracts/edge_telemetry.schema.json); the Pydantic models mirror it exactly.
+Canonical contract lives in [`contracts/edge_telemetry.schema.json`](contracts/edge_telemetry.schema.json); the Pydantic models mirror it exactly. Verdicts and the loss time‑series are **durably persisted** (SQLite by default, Postgres via `DATABASE_URL`) so history survives restarts; every theft verdict can also **fan out to a webhook / Telegram** — both are best‑effort and no‑op if unconfigured, so the demo is never blocked by the network.
 
 | Method & path | Body | Returns |
 |---|---|---|
@@ -228,7 +234,7 @@ Canonical contract lives in [`contracts/edge_telemetry.schema.json`](contracts/e
 | `POST /meters/reading` | `{meter_id, ts, energy_wh_interval, p_active_w}` | `{ok:true}` |
 | `GET /transformers` | — | `[Transformer]` + latest verdict |
 | `GET /transformers/{id}` | — | detail + recent readings + verdicts |
-| `GET /transformers/{id}/history` | — | time‑series of readings & verdicts (dashboard charts) |
+| `GET /transformers/{id}/history` | — | durable time‑series of readings & verdicts (dashboard charts) — survives restarts |
 | `GET /verdicts?label&severity&status` | — | `[Verdict]` newest first |
 | `POST /verdicts/{id}/status` | `{status}` | `Verdict` |
 | `POST /sim/scenario` | `{transformer_id, scenario}` | `{ok:true}` — `normal \| technical \| theft` |
@@ -248,6 +254,8 @@ Hackathon Kafrelsha5/
 │  └─ app/
 │     ├─ main.py          FastAPI: /ingest /meters /verdicts + WS + dashboard
 │     ├─ contract.py      Pydantic models == JSON Schema
+│     ├─ db.py            durable persistence (SQLModel → SQLite / Postgres) — history survives restarts
+│     ├─ alerts.py        theft fan-out to webhook / Telegram (best-effort, optional)
 │     ├─ store.py ws.py queue.py tasks.py config.py
 │     └─ detection/       energy_balance · technical_loss · accounting · harmonics · harmonic_cnn · anomaly · decision
 ├─ simulator/     no-hardware demo + live telemetry stream
@@ -256,8 +264,14 @@ Hackathon Kafrelsha5/
 │  ├─ generate_harmonics.py · train_harmonics.py (1D-CNN harmonic classifier)
 │  ├─ evaluate.py                                (fused-pipeline metrics → eval_report.json)
 │  └─ artifacts/  tech_loss.pkl · iforest.pkl · harmonic_cnn.pt · calibrator.pkl · *.json
-├─ dashboard/     single-file ops dashboard (served at /)
-├─ pitch/         index.html (web) · Grid-Pulse-NTL.pptx/.pdf · build_pptx.py
+├─ dashboard/     single-file ops dashboard (served at /) + vendored assets
+├─ pitch/         technical deck — index.html · Grid-Pulse-NTL.pptx/.pdf · build_pptx.py
+├─ pitch-formal/  formal/investor deck — index.html · *.pptx/.pdf · build_pptx.py
+├─ business/      business-case deck — index.html · *.pptx/.pdf · build_pptx.py
+├─ competition/   competition one-pager (index.html)
+├─ deployment/    static landing / deployment page
+├─ assets/        dashboard.jpg · kiosk.jpg (screenshots)
+├─ DEMO.md        full click-by-click demo walkthrough
 └─ docker-compose.yml · .env.example · README.md
 ```
 
@@ -318,15 +332,29 @@ Pitched as the scaling/defense roadmap — *not* built for the hackathon:
 
 ## 🎤 Presenting
 
+- **Demo guide** — full click‑by‑click walkthrough (every command, button, result, fallback): [`DEMO.md`](DEMO.md)
 - **Demo runbook** — timed 90‑second script + Q&A + fallbacks: [`plan/06-demo-runbook.md`](plan/06-demo-runbook.md)
-- **Pitch page / deck** — [`pitch/index.html`](pitch/index.html) · `pitch/Grid-Pulse-NTL.pptx` · `pitch/Grid-Pulse-NTL.pdf`
+- **Decks** — technical [`pitch/`](pitch/) · formal/investor [`pitch-formal/`](pitch-formal/) · business‑case [`business/`](business/) (each has `index.html` + `.pptx`/`.pdf`) · competition one‑pager [`competition/`](competition/)
 - **Full plan set** — [`plan/`](plan/): overview · architecture · detection & AI · 96h timeline · tasks & roles · demo/pitch · runbook
 
 <br/>
 
 ## ⚙️ Configuration
 
-`INLINE_DETECTION=true` (default) runs detection inside the API — simplest and demo‑safe. Set it `false` to route through the Celery worker (the microservices story); verdicts are published back over Redis pub/sub. Other knobs: `INGEST_TOKEN`, `RESIDUAL_ALERT_W` (unexplained watts before suspicion), `HEALTHY_PF`, `REDIS_URL`, and the energy‑accounting layer — `ACCOUNTING_HORIZON_H`, `ACCOUNTING_K`, `ACCOUNTING_NEUTRAL`.
+`INLINE_DETECTION=true` (default) runs detection inside the API — simplest and demo‑safe. Set it `false` to route through the Celery worker (the microservices story); verdicts are published back over Redis pub/sub. Everything below is optional with sane defaults:
+
+| Knob | Default | What it does |
+|---|---|---|
+| `INGEST_TOKEN` | `dev-token` | bearer token the edge must send to `/ingest` |
+| `RESIDUAL_ALERT_W` | `400` | unexplained watts before suspicion |
+| `HEALTHY_PF` · `THD_ALERT_PCT` | `0.92` · `10` | power‑factor floor · THD alert threshold |
+| `REDIS_URL` | local | queue + pub/sub for Celery mode |
+| `DATABASE_URL` | `sqlite:////data/gridpulse.db` | durable store; point at Postgres in production |
+| `AUTO_STREAM` · `AUTO_STREAM_INTERVAL_S` | `true` · `4` | always‑on background telemetry so the console looks live |
+| `ACCOUNTING_HORIZON_H` · `ACCOUNTING_K` · `ACCOUNTING_NEUTRAL` | `1.0` · `1.4` · `18` | energy‑accounting evidence layer |
+| `ALERT_WEBHOOK_URL` · `TELEGRAM_BOT_TOKEN` · `TELEGRAM_CHAT_ID` | unset | fan out theft verdicts (no‑op if unset) |
+
+Persistence and alerts are best‑effort: if their optional deps are missing or a sink is unreachable, the backend runs exactly as before (pure in‑memory) — the demo never depends on them.
 
 <br/>
 

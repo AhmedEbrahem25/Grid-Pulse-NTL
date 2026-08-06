@@ -1,0 +1,1452 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Grid-Pulse NTL — Pitch</title>
+  <meta name="description" content="Grid-Pulse NTL: Autonomous Electricity-Theft Detection for the Distribution Grid" />
+  <meta name="theme-color" content="#050505" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='g' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='%2322e5ff'/%3E%3Cstop offset='100%25' stop-color='%230066ff'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='38' fill='url(%23g)'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* =====================================================================
+       Tokens
+       ===================================================================== */
+    :root {
+      --bg: #050505;
+      --fg: #f5f7fa;
+      --muted: #a3b0c2;
+      --dim: #6c788a;
+      --hairline: rgba(255, 255, 255, 0.1);
+      --glass: rgba(255, 255, 255, 0.04);
+      --accent-1: #0066ff; /* Deep grid blue */
+      --accent-2: #22e5ff; /* Bright signal cyan */
+      --accent-grad: linear-gradient(135deg, #22e5ff 0%, #0066ff 100%);
+      --alert: #ff3b5c;    /* Semantic: theft / alarm only */
+      --ok: #37d67a;       /* Semantic: healthy / no false alarm */
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    /* =====================================================================
+       Reset
+       ===================================================================== */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+      font-weight: 400;
+      color: var(--fg);
+      background: var(--bg);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+    img, svg { display: block; max-width: 100%; }
+    aside.notes { display: none; }
+
+    /* =====================================================================
+       Chrome
+       ===================================================================== */
+    .deck-chrome {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 2.5rem;
+      z-index: 30;
+      pointer-events: none;
+    }
+    .deck-chrome > * { pointer-events: auto; }
+    .brand {
+      display: inline-flex; align-items: center; gap: 0.7rem;
+      font-weight: 600; letter-spacing: 0.02em; font-size: 1.1rem;
+    }
+    .brand .mark {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--accent-grad);
+      box-shadow: 0 0 16px var(--accent-2);
+    }
+    .counter {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+    .counter #cur { color: var(--fg); }
+    .progress-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: rgba(255,255,255,0.08);
+      z-index: 31;
+    }
+    .progress-bar span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: var(--accent-grad);
+      box-shadow: 0 0 15px rgba(34, 229, 255, 0.6);
+      transition: width 0.6s cubic-bezier(.2,.7,.2,1);
+    }
+
+    .dots {
+      position: fixed;
+      bottom: 2rem; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 0.75rem;
+      z-index: 30;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      transition: background 0.4s, transform 0.4s cubic-bezier(.2,.7,.2,1);
+    }
+    .dot:hover { background: rgba(255,255,255,0.5); }
+    .dot.is-active { background: var(--accent-2); transform: scale(1.5); box-shadow: 0 0 12px var(--accent-2); }
+
+    .nav {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: rgba(15,15,15,0.7);
+      border: 1px solid var(--hairline);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      color: var(--fg);
+      display: grid; place-items: center;
+      font-size: 1.5rem;
+      opacity: 0;
+      transition: opacity 0.4s, transform 0.4s cubic-bezier(.2,.7,.2,1), border-color 0.4s, background 0.4s;
+      z-index: 30;
+    }
+    .nav.prev { left: 2rem; }
+    .nav.next { right: 2rem; }
+    body:hover .nav { opacity: 0.75; }
+    .nav:hover { opacity: 1 !important; border-color: rgba(34, 229, 255, 0.5); transform: translateY(-50%) scale(1.08); background: rgba(20,20,20,0.9); }
+    .nav:disabled { opacity: 0 !important; pointer-events: none; }
+
+    .hint {
+      position: fixed;
+      bottom: 2rem; right: 2.5rem;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
+      background: rgba(15,15,15,0.6);
+      border: 1px solid var(--hairline);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 30;
+      transition: opacity 0.5s;
+    }
+    .hint.is-faded { opacity: 0.25; }
+
+    /* =====================================================================
+       Deck + Slides
+       ===================================================================== */
+    #deck {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      transition: transform 0.6s cubic-bezier(.2,.7,.2,1);
+      transform-origin: center center;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      align-items: center;
+      padding: clamp(2rem, 6vh, 5rem) clamp(3rem, 10vw, 9rem);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      will-change: opacity, transform, filter;
+    }
+    .slide.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .slide-inner {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1400px;
+      margin-inline: auto;
+    }
+
+    /* =====================================================================
+       Illustrations
+       ===================================================================== */
+    .illustration {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .illustration svg { width: 100%; height: 100%; display: block; }
+    .ill-cover   { opacity: 0.65; }
+    .ill-problem { opacity: 0.75; }
+    .ill-insight { opacity: 0.60; }
+    .ill-closing { opacity: 0.85; }
+
+    @keyframes mesh-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes signal-drift {
+      0%   { transform: translateX(-3%); }
+      100% { transform: translateX(3%); }
+    }
+    @keyframes ring-pulse {
+      0%, 100% { transform: scale(1);    opacity: 1; }
+      50%      { transform: scale(1.05); opacity: 0.7; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ill-cover .landmarks circle,
+      .ill-insight .landmarks circle,
+      .ill-problem .nodes-bright circle,
+      .ill-closing .signal,
+      .ill-closing .rings { animation: none !important; }
+    }
+
+    /* =====================================================================
+       Typography
+       ===================================================================== */
+    .eyebrow {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 2rem;
+      opacity: 0.9;
+    }
+    .h1 {
+      font-size: clamp(3.5rem, 8vw, 7rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      margin: 0 0 1.5rem;
+    }
+    .h2 {
+      font-size: clamp(2.8rem, 6.5vw, 5rem);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin: 0 0 1.75rem;
+    }
+    .body {
+      font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+      color: var(--muted);
+      max-width: 65ch;
+      margin: 0;
+      line-height: 1.6;
+    }
+    .body + .body { margin-top: 1.25rem; }
+    .accent-text {
+      background: var(--accent-grad);
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+    }
+    .word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.05em; }
+    .word .inner { display: inline-block; transform: translateY(110%); will-change: transform; }
+    .reveal { opacity: 0; transform: translateY(24px); }
+
+    /* =====================================================================
+       Cover
+       ===================================================================== */
+    .cover { text-align: center; }
+    .cover .h1 { font-size: clamp(4rem, 12vw, 9.5rem); margin-bottom: 1.5rem; }
+    .cover .body { margin: 0 auto; max-width: 70ch; }
+    .ambient { position: absolute; inset: 0; pointer-events: none; z-index: -1; overflow: hidden; }
+    .ambient::before, .ambient::after {
+      content: ''; position: absolute; border-radius: 50%;
+      filter: blur(100px); opacity: 0.6; will-change: transform;
+    }
+    .ambient::before {
+      width: 60vmax; height: 60vmax; left: -10vmax; top: -10vmax;
+      background: radial-gradient(circle, rgba(0,102,255,0.45), transparent 60%);
+      animation: pulse 10s ease-in-out infinite;
+    }
+    .ambient::after {
+      width: 50vmax; height: 50vmax; right: -8vmax; bottom: -12vmax;
+      background: radial-gradient(circle, rgba(34,229,255,0.32), transparent 60%);
+      animation: pulse 12s ease-in-out infinite reverse;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.5; }
+      50%      { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    /* =====================================================================
+       Problem — big stat
+       ===================================================================== */
+    .stat-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(3rem, 7vw, 6rem); align-items: end; }
+    .big-stat {
+      font-size: clamp(5rem, 13vw, 12rem);
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 0.95;
+      background: var(--accent-grad);
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+    }
+    .big-stat-label {
+      display: block;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 1.25rem;
+    }
+    @media (max-width: 900px) { .stat-grid { grid-template-columns: 1fr; } }
+
+    /* =====================================================================
+       Pillars (Solution)
+       ===================================================================== */
+    .pillar-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-top: 3rem; }
+    .pillar-grid.four { grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 900px) { .pillar-grid, .pillar-grid.four { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .pillar-grid, .pillar-grid.four { grid-template-columns: 1fr; } }
+
+    .pillar {
+      padding: 2rem;
+      border-radius: 20px;
+      background: var(--glass);
+      border: 1px solid var(--hairline);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      min-height: 220px;
+      display: flex; flex-direction: column;
+    }
+    .pillar h3 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 0.8rem; color: var(--fg); }
+    .pillar p { font-size: 1.1rem; color: var(--muted); line-height: 1.6; margin: 0; }
+    .pillar-tag {
+      margin-top: auto; padding-top: 1.5rem;
+      font-family: var(--mono);
+      font-size: 0.85rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+      color: var(--accent-2);
+    }
+
+    /* =====================================================================
+       Architecture stack
+       ===================================================================== */
+    .stack { display: grid; gap: 1rem; margin-top: 3rem; max-width: 900px; }
+    .layer {
+      display: grid;
+      grid-template-columns: 12rem 1fr;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 1.5rem 2rem;
+      border-radius: 16px;
+      background: var(--glass);
+      border: 1px solid var(--hairline);
+    }
+    .layer-name {
+      font-family: var(--mono);
+      font-size: 0.95rem; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+    }
+    .layer-content { font-size: 1.25rem; color: var(--fg); font-weight: 500; }
+    .layer-content .sep { color: var(--dim); margin: 0 0.75rem; }
+    .layer-arrow {
+      display: grid; place-items: center;
+      height: 1rem;
+      color: var(--dim);
+      font-size: 1rem;
+    }
+    @media (max-width: 800px) {
+      .layer { grid-template-columns: 1fr; gap: 0.6rem; padding: 1.25rem; }
+    }
+
+    /* =====================================================================
+       Results / Layouts
+       ===================================================================== */
+    .results-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(3rem, 6vw, 5rem);
+      margin-top: 3rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .results-layout { grid-template-columns: 1fr; } }
+
+    .cred-section { display: flex; flex-direction: column; gap: 2.5rem; }
+    .cred-block h4 {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin: 0 0 1rem;
+    }
+    .cred-block ul {
+      margin: 0; padding: 0; list-style: none;
+      display: flex; flex-direction: column; gap: 0.85rem;
+    }
+    .cred-block li {
+      font-size: 1.15rem;
+      color: var(--muted);
+      padding-left: 1.5rem;
+      position: relative;
+      line-height: 1.6;
+    }
+    .cred-block.why li::before {
+      content: '—';
+      position: absolute; left: 0;
+      color: var(--accent-1);
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+
+    /* =====================================================================
+       Value + Future
+       ===================================================================== */
+    .value-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(3rem, 6vw, 5rem);
+      margin-top: 3rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .value-layout { grid-template-columns: 1fr; } }
+
+    .value-col h4, .roadmap-col h4 {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin: 0 0 1.25rem;
+    }
+    .value-col ul {
+      margin: 0; padding: 0; list-style: none;
+      display: flex; flex-direction: column; gap: 1rem;
+    }
+    .value-col li {
+      font-size: 1.15rem;
+      color: var(--muted);
+      padding-left: 1.5rem;
+      position: relative;
+      line-height: 1.6;
+    }
+    .value-col li::before {
+      content: '→';
+      position: absolute; left: 0;
+      color: var(--accent-1);
+      font-size: 1.2rem;
+      font-weight: bold;
+      top: 0.1em;
+    }
+    .roadmap-list { display: flex; flex-direction: column; gap: 1rem; }
+    .roadmap-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+      padding: 1.25rem 1.5rem;
+      border-radius: 12px;
+      background: var(--glass);
+      border: 1px solid var(--hairline);
+    }
+    .roadmap-phase {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      white-space: nowrap;
+      padding-top: 0.15rem;
+      min-width: 5.5rem;
+    }
+    .roadmap-desc {
+      font-size: 1.15rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* =====================================================================
+       Verdict chips (demo slide)
+       ===================================================================== */
+    .beat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1.75rem; }
+    @media (max-width: 900px) { .beat-row { grid-template-columns: 1fr 1fr; } }
+    .beat {
+      padding: 1.1rem 1.25rem;
+      border-radius: 14px;
+      background: var(--glass);
+      border: 1px solid var(--hairline);
+    }
+    .beat .beat-in {
+      font-size: 1.05rem; color: var(--fg); font-weight: 500; display: block; margin-bottom: 0.5rem;
+    }
+    .beat .beat-out {
+      font-family: var(--mono); font-size: 0.8rem; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--ok);
+    }
+    .beat.is-theft { border-color: rgba(255,59,92,0.55); background: rgba(255,59,92,0.07); }
+    .beat.is-theft .beat-out { color: var(--alert); }
+
+    /* =====================================================================
+       Speaker notes panel
+       ===================================================================== */
+    .notes-panel {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 1.5rem 2.5rem 1.8rem;
+      background: rgba(5,5,7,0.96);
+      border-top: 1px solid var(--hairline);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      z-index: 40;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(.2,.7,.2,1);
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    .notes-panel.is-open { transform: translateY(0); }
+    .notes-label {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 0.8rem;
+      opacity: 0.9;
+    }
+    .notes-text {
+      font-size: 1.1rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 90ch;
+    }
+    .notes-hint {
+      position: fixed;
+      bottom: 2rem; left: 2.5rem;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
+      background: rgba(15,15,15,0.6);
+      border: 1px solid var(--hairline);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 30;
+      transition: opacity 0.5s;
+    }
+    .notes-hint.is-hidden { display: none; }
+
+    /* =====================================================================
+       Overview mode
+       ===================================================================== */
+    body.is-overview { overflow-y: auto; overflow-x: hidden; }
+    body.is-overview #deck {
+      position: static;
+      width: 100vw; height: auto;
+      transform: none;
+      pointer-events: auto;
+      padding: 6rem 3rem 6rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      overflow: visible;
+    }
+    @media (max-width: 1100px) { body.is-overview #deck { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px) { body.is-overview #deck { grid-template-columns: 1fr; } }
+    body.is-overview .slide {
+      position: relative;
+      inset: auto;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      height: auto;
+      padding: 0;
+      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: auto;
+      cursor: pointer;
+      filter: none !important;
+      border: 2px solid var(--hairline);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--bg);
+      display: block;
+      transition: border-color 0.3s, transform 0.3s ease;
+    }
+    body.is-overview .slide:hover { border-color: rgba(34,229,255,0.6); transform: scale(1.03) !important; }
+    body.is-overview .slide.is-active { border-color: rgba(34,229,255,0.9); box-shadow: 0 0 30px rgba(0,102,255,0.3); }
+    body.is-overview .slide-inner {
+      width: 1600px;
+      max-width: none;
+      height: 900px;
+      padding: 100px 140px;
+      transform: scale(var(--ov-scale, 0.28));
+      transform-origin: top left;
+      display: grid;
+      align-content: center;
+    }
+    body.is-overview .ambient { display: none; }
+    body.is-overview .nav,
+    body.is-overview .hint,
+    body.is-overview .dots,
+    body.is-overview .progress-bar,
+    body.is-overview .notes-panel,
+    body.is-overview .notes-hint { display: none !important; }
+    body.is-overview .deck-chrome {
+      background: linear-gradient(to bottom, rgba(5,5,5,0.95), transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    body.is-overview .word .inner { transform: none !important; }
+    body.is-overview .reveal { opacity: 1 !important; transform: none !important; }
+  </style>
+</head>
+<body>
+  <header class="deck-chrome">
+    <a class="brand" href="#" aria-label="Back to site">
+      <span class="mark"></span>
+      <span>Grid-Pulse NTL</span>
+    </a>
+    <div class="counter"><span id="cur">01</span> <span style="color:var(--dim)">/</span> <span id="tot">11</span></div>
+  </header>
+
+  <div class="progress-bar"><span id="progress"></span></div>
+
+  <main id="deck">
+
+    <!-- ===================== Slide 1 — Cover ===================== -->
+    <section class="slide is-active cover" data-i="0">
+      <div class="ambient" aria-hidden="true"></div>
+      <div class="illustration ill-cover" aria-hidden="true">
+        <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g-cover" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"  stop-color="#22e5ff" stop-opacity="0.22"/>
+              <stop offset="100%" stop-color="#0066ff" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#g-cover)"/>
+          <!-- Transmission pylons -->
+          <g stroke="#0066ff" stroke-width="2" fill="none" stroke-opacity="0.45">
+            <path d="M 260 780 L 300 380 L 340 780 M 270 680 L 330 680 M 280 580 L 320 580" />
+            <path d="M 180 430 L 300 380 L 420 430" />
+            <path d="M 160 330 L 300 300 L 440 330" />
+            <path d="M 300 380 L 300 260" />
+
+            <path d="M 760 780 L 800 380 L 840 780 M 770 680 L 830 680 M 780 580 L 820 580" />
+            <path d="M 680 430 L 800 380 L 920 430" />
+            <path d="M 660 330 L 800 300 L 940 330" />
+            <path d="M 800 380 L 800 260" />
+
+            <path d="M 1260 780 L 1300 380 L 1340 780 M 1270 680 L 1330 680 M 1280 580 L 1320 580" />
+            <path d="M 1180 430 L 1300 380 L 1420 430" />
+            <path d="M 1160 330 L 1300 300 L 1440 330" />
+            <path d="M 1300 380 L 1300 260" />
+          </g>
+          <!-- Catenary power lines -->
+          <g stroke="#22e5ff" stroke-width="1.6" fill="none" stroke-opacity="0.35">
+            <path d="M 180 430 Q 480 520 680 430" />
+            <path d="M 420 430 Q 610 520 920 430" transform="translate(260 0)"/>
+            <path d="M 160 330 Q 480 420 660 330" />
+            <path d="M 940 330 Q 1120 420 1440 330" />
+          </g>
+          <!-- Travelling current pulses -->
+          <g fill="#22e5ff">
+            <circle r="6" opacity="0.9">
+              <animateMotion path="M 180 430 Q 480 520 680 430" dur="4s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0;1;0" dur="4s" repeatCount="indefinite"/>
+            </circle>
+            <circle r="5" opacity="0.8">
+              <animateMotion path="M 160 330 Q 480 420 660 330" dur="5.5s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0;0.9;0" dur="5.5s" repeatCount="indefinite"/>
+            </circle>
+            <circle r="5" fill="#0066ff" opacity="0.8">
+              <animateMotion path="M 940 330 Q 1120 420 1440 330" dur="6s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0;0.9;0" dur="6s" repeatCount="indefinite"/>
+            </circle>
+          </g>
+          <!-- Ground / feeder rail -->
+          <g stroke="#0066ff" stroke-width="1.4" stroke-opacity="0.22" stroke-dasharray="8 8">
+            <line x1="0" y1="780" x2="1600" y2="780"/>
+          </g>
+        </svg>
+      </div>
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 1 · Opening</span>
+        <h1 class="h1" data-split>Grid-Pulse NTL</h1>
+        <p class="body reveal">Autonomous Electricity-Theft Detection for the Distribution Grid</p>
+      </div>
+      <aside class="notes">Good morning, doctors.<br><br>Every year, Egypt loses an estimated thirty billion pounds of electricity that is generated, delivered, and consumed — but never billed.<br><br>This is called Non-Technical Loss: illegal direct hooks on the network, tampered meters, unlicensed workshops and factories pulling unmetered power.<br><br>It is not only a financial loss. It overloads transformers with demand nobody is accounting for, and it makes load-shedding worse for the people who do pay their bills.<br><br>That is where our project comes in:<br><br>Grid-Pulse NTL.</aside>
+    </section>
+
+    <!-- ===================== Slide 2 — Problem ===================== -->
+    <section class="slide" data-i="1">
+      <div class="illustration ill-problem" aria-hidden="true">
+        <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g-prob" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"  stop-color="#0066ff" stop-opacity="0.15"/>
+              <stop offset="100%" stop-color="#0066ff" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="g-gap" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%"  stop-color="#ff3b5c" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#ff3b5c" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#g-prob)"/>
+          <g transform="translate(1000 450)">
+            <!-- Delivered energy (what the transformer pushes out) -->
+            <path d="M -300 200 L -150 120 L 0 160 L 150 40 L 320 80 L 500 -60"
+                  stroke="#22e5ff" stroke-width="5" fill="none" stroke-opacity="0.85"/>
+            <!-- Billed energy (what the meters report) -->
+            <path d="M -300 240 L -150 190 L 0 230 L 150 190 L 320 260 L 500 300"
+                  stroke="#0066ff" stroke-width="4" fill="none" stroke-opacity="0.6" stroke-dasharray="12 8"/>
+            <!-- The unbilled gap -->
+            <path d="M -300 200 L -150 120 L 0 160 L 150 40 L 320 80 L 500 -60 L 500 300 L 320 260 L 150 190 L 0 230 L -150 190 L -300 240 Z"
+                  fill="url(#g-gap)"/>
+            <!-- Alarm on the divergence -->
+            <circle cx="500" cy="-60" r="14" fill="#ff3b5c">
+              <animate attributeName="r" values="14; 30; 14" dur="1.6s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="1; 0; 1" dur="1.6s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="500" cy="-60" r="8" fill="#fff"/>
+          </g>
+        </svg>
+      </div>
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 2 · Problem</span>
+        <div class="stat-grid">
+          <div>
+            <span class="big-stat reveal">~30B</span>
+            <span class="big-stat-label reveal">EGP lost to electricity theft every year</span>
+          </div>
+          <div>
+            <h2 class="h2 reveal" style="font-size: 2rem;">Where it hurts</h2>
+            <p class="body reveal">Distribution companies are blind to <em>where</em> the loss actually happens.</p>
+            <ul class="body reveal" style="list-style: none; padding: 0; display: grid; gap: 1rem; margin-top: 1.5rem;">
+               <li>→ Revenue bleeding from every feeder</li>
+               <li>→ Transformers overloaded by unbilled demand</li>
+               <li>→ Worse load-shedding for paying customers</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <aside class="notes">Non-Technical Loss is theft on the distribution network: illegal direct hooks, tampered meters, unlicensed workshops, brick factories, and crypto rigs drawing unmetered power.<br><br>In Egypt the estimate is around thirty billion pounds a year.<br><br>And the damage is not only financial:<br><br>the distribution company is blind to where the theft is happening,<br>transformers carry demand nobody is billed for,<br>and that unbilled demand directly worsens load-shedding for the customers who do pay.<br><br>Field inspection teams today chase random tips, and most trips come back empty.</aside>
+    </section>
+
+    <!-- ===================== Slide 3 — Why Now / The Hard Part ===================== -->
+    <section class="slide" data-i="2">
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 3 · Why Now / The Hard Part</span>
+        <h2 class="h2" data-split>Not every loss is theft.</h2>
+        <div class="pillar-grid">
+          <div class="pillar reveal">
+            <h3>Technical loss — natural</h3>
+            <p>Cables shed energy as heat. That loss <strong style="color:var(--fg);">rises with temperature and with load</strong> — Egyptian summer, peak hours.</p>
+            <span class="pillar-tag" style="color: var(--ok);">Legitimate · no alarm</span>
+          </div>
+          <div class="pillar reveal" style="border-color: rgba(255,59,92,0.55); background: rgba(255,59,92,0.06); box-shadow: 0 0 40px rgba(255,59,92,0.1) inset;">
+            <h3 style="color: var(--alert);">Non-technical loss — theft</h3>
+            <p>Energy delivered, consumed, and never billed. Invisible in the totals, because it hides <em>inside</em> the natural loss.</p>
+            <span class="pillar-tag" style="color: var(--alert);">Unexplained · must be flagged</span>
+          </div>
+        </div>
+        <p class="body reveal" style="margin-top: 2.5rem;">A naive "meter-difference" alarm cannot tell them apart — so on a hot day it fires on physics, floods operators with false positives, and gets switched off.</p>
+      </div>
+      <aside class="notes">Here is the part that makes this problem hard.<br><br>Measuring power is easy. Separating theft from legitimate loss is not.<br><br>Cables naturally shed energy as heat, and that technical loss rises with temperature and with load. In an Egyptian summer, at peak hours, natural loss can be large — and completely legitimate.<br><br>So a naive system that simply subtracts the meters from the transformer will raise an alarm on a hot day. It is firing on physics, not on theft.<br><br>That is why these systems flood operators with false positives — and a system that cries wolf gets ignored and switched off.<br><br>This is exactly where artificial intelligence becomes essential.</aside>
+    </section>
+
+    <!-- ===================== Slide 4 — Why Existing Solutions Fail ===================== -->
+    <section class="slide" data-i="3">
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 4 · Why Existing Solutions Fail</span>
+        <h2 class="h2" data-split>Fixed thresholds cannot follow a living grid.</h2>
+
+        <div class="value-layout" style="margin-top: 4rem;">
+          <div class="value-col reveal">
+            <h4>Current Approaches</h4>
+            <ul>
+              <li>Manual inspection driven by tips and complaints</li>
+              <li>Fixed-threshold meter-difference alarms</li>
+              <li>Monitoring platforms that only display data</li>
+            </ul>
+          </div>
+          <div class="value-col reveal">
+            <h4>But The Grid Keeps Moving</h4>
+            <ul>
+              <li>Ambient temperature changes</li>
+              <li>Load profile changes hour by hour</li>
+              <li>Legitimate industrial customers distort the waveform</li>
+              <li>Feeder topology and demand change</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <aside class="notes">Today's approaches fall into three categories:<br><br>manual inspection driven by tips and complaints,<br>fixed-threshold meter-difference alarms,<br>or monitoring platforms that only display data and leave the judgment to a human.<br><br>But the distribution grid is a living system.<br><br>Temperature changes. Load changes hour by hour. A legitimate registered factory distorts the current waveform exactly the way an illegal hook does. Feeder demand changes.<br><br>A fixed threshold cannot follow that. It is either too sensitive — and drowns the operator in false alarms — or too loose, and misses the theft entirely.</aside>
+    </section>
+
+    <!-- ===================== Slide 5 — Solution ===================== -->
+    <section class="slide" data-i="4">
+      <div class="illustration ill-insight" aria-hidden="true">
+        <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g-insight" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"  stop-color="#0066ff" stop-opacity="0.1"/>
+              <stop offset="50%" stop-color="#0066ff" stop-opacity="0.0"/>
+              <stop offset="100%" stop-color="#22e5ff" stop-opacity="0.15"/>
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#g-insight)"/>
+          <g transform="translate(1250 450) scale(1.3)">
+             <!-- Central node = the transformer under watch -->
+             <polygon points="0,-80 69,-40 69,40 0,80 -69,40 -69,-40" stroke="#22e5ff" stroke-width="3" fill="none" stroke-opacity="0.9"/>
+             <!-- Surrounding nodes = feeders / meters -->
+             <polygon points="0,-240 69,-200 69,-120 0,-80 -69,-120 -69,-200" stroke="#0066ff" stroke-width="2" fill="none" stroke-opacity="0.6"/>
+             <polygon points="138,-160 207,-120 207,-40 138,0 69,-40 69,-120" stroke="#0066ff" stroke-width="2" fill="none" stroke-opacity="0.6"/>
+             <polygon points="138,160 207,120 207,40 138,0 69,40 69,120" stroke="#0066ff" stroke-width="2" fill="none" stroke-opacity="0.6"/>
+             <polygon points="0,240 69,200 69,120 0,80 -69,120 -69,200" stroke="#ff3b5c" stroke-width="2.5" fill="rgba(255,59,92,0.06)" stroke-opacity="0.75"/>
+             <polygon points="-138,160 -207,120 -207,40 -138,0 -69,40 -69,120" stroke="#0066ff" stroke-width="2" fill="none" stroke-opacity="0.6"/>
+             <polygon points="-138,-160 -207,-120 -207,-40 -138,0 -69,-40 -69,-120" stroke="#0066ff" stroke-width="2" fill="none" stroke-opacity="0.6"/>
+
+             <!-- Sensing links -->
+             <line x1="0" y1="-80" x2="0" y2="-120" stroke="#22e5ff" stroke-width="2"/>
+             <line x1="69" y1="-40" x2="103.5" y2="-60" stroke="#22e5ff" stroke-width="2"/>
+             <line x1="69" y1="40" x2="103.5" y2="60" stroke="#22e5ff" stroke-width="2"/>
+             <line x1="0" y1="80" x2="0" y2="120" stroke="#ff3b5c" stroke-width="2.5">
+               <animate attributeName="stroke-opacity" values="1;0.2;1" dur="1.8s" repeatCount="indefinite"/>
+             </line>
+             <line x1="-69" y1="40" x2="-103.5" y2="60" stroke="#22e5ff" stroke-width="2"/>
+             <line x1="-69" y1="-40" x2="-103.5" y2="-60" stroke="#22e5ff" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 5 · Solution</span>
+        <h2 class="h2" data-split>Grid-Pulse NTL</h2>
+        <p class="body reveal" style="margin-bottom: 3.5rem;">An AI edge-system that catches theft — and knows the difference between theft and physics.</p>
+        <div class="pillar-grid four">
+          <div class="pillar reveal" style="min-height: 120px; justify-content: center;">
+            <h3 style="margin:0;">Continuous Energy Balance</h3>
+          </div>
+          <div class="pillar reveal" style="min-height: 120px; justify-content: center;">
+            <h3 style="margin:0;">AI Technical-Loss Baseline</h3>
+          </div>
+          <div class="pillar reveal" style="min-height: 120px; justify-content: center;">
+            <h3 style="margin:0;">Harmonic Fingerprint (1D-CNN)</h3>
+          </div>
+          <div class="pillar reveal" style="min-height: 120px; justify-content: center;">
+            <h3 style="margin:0;">Explainable Verdicts</h3>
+          </div>
+        </div>
+      </div>
+      <aside class="notes">Our solution is Grid-Pulse NTL.<br><br>A clip-on current sensor and an ESP32 edge node at the distribution transformer, feeding an AI detection pipeline.<br><br>It combines four things:<br><br>a continuous energy balance at the transformer — what goes out versus what the registered meters report;<br>an AI technical-loss baseline that predicts how much loss is normal right now, given load, temperature, and time;<br>a one-dimensional CNN that reads the harmonic fingerprint of the current;<br>and an explainable verdict layer.<br><br>Here is the whole idea in one sentence:<br><br>The AI predicts the natural loss, and only the unexplained excess — corroborated by power factor, harmonics, and a temporal anomaly — is flagged as theft.<br><br>That separation is the product. It is what kills the false positives.</aside>
+    </section>
+
+    <!-- ===================== Slide 6 — Technical Scope ===================== -->
+    <section class="slide" data-i="5">
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 6 · Technical Scope</span>
+        <h2 class="h2" data-split>Detection Intelligence Layer</h2>
+
+        <div class="stack">
+          <div class="layer reveal">
+            <span class="layer-name" style="color:var(--accent-2);">Core Rule</span>
+            <span class="layer-content">Sits <strong style="color:var(--accent-2);">on top</strong> of the existing grid — no rewiring, no interruption of supply.</span>
+          </div>
+          <div class="layer-arrow reveal">↓</div>
+          <div class="layer reveal">
+            <span class="layer-name">Edge</span>
+            <span class="layer-content">Clip-on CT + ESP32<span class="sep">·</span>RMS · power factor · FFT/THD computed locally</span>
+          </div>
+          <div class="layer-arrow reveal">↓</div>
+          <div class="layer reveal">
+            <span class="layer-name">Ingest</span>
+            <span class="layer-content">Strict-contract API<span class="sep">·</span>Redis queue<span class="sep">·</span>async workers</span>
+          </div>
+          <div class="layer-arrow reveal">↓</div>
+          <div class="layer reveal">
+            <span class="layer-name">Detect</span>
+            <span class="layer-content">Energy balance → loss baseline → harmonics → anomaly → fusion</span>
+          </div>
+          <div class="layer-arrow reveal">↓</div>
+          <div class="layer reveal">
+            <span class="layer-name">Deliver</span>
+            <span class="layer-content">Theft probability<span class="sep">·</span>reasons checklist<span class="sep">·</span>ranked field leads</span>
+          </div>
+        </div>
+      </div>
+      <aside class="notes">An important clarification about scope.<br><br>Our system does not interfere with the operation of the grid itself. There is no rewiring and no interruption of supply. The sensor is a clip-on current transformer — it is installed without cutting the line.<br><br>We add a detection intelligence layer on top of the existing infrastructure.<br><br>At the edge, the ESP32 does the signal processing locally: RMS current, power factor, and an FFT for harmonic distortion. We ship features, not raw waveforms — tiny payloads, so this scales to thousands of transformers.<br><br>The ingest API validates every payload against a strict contract and rejects anything malformed. Redis absorbs bursts, and workers run the AI asynchronously.<br><br>Then five independent steps fuse into one verdict — and that verdict arrives with a probability and a list of reasons, not a bare alarm.</aside>
+    </section>
+
+    <!-- ===================== Slide 7 — Demo ===================== -->
+    <section class="slide" data-i="6">
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 7 · Demo</span>
+
+        <div class="reveal" style="margin-top: 1.5rem; border-radius: 16px; overflow: hidden; border: 1px solid rgba(34,229,255,0.3); box-shadow: 0 10px 40px rgba(0,102,255,0.15); position: relative;">
+          <img src="../assets/dashboard.jpg" alt="Grid-Pulse NTL operations console showing a theft verdict with theft probability and the reasons checklist" style="width: 100%; display: block;" />
+        </div>
+
+        <div class="beat-row">
+          <div class="beat reveal">
+            <span class="beat-in">Normal load</span>
+            <span class="beat-out">Normal · balance holds</span>
+          </div>
+          <div class="beat reveal">
+            <span class="beat-in">Hot day</span>
+            <span class="beat-out">Technical · no alarm</span>
+          </div>
+          <div class="beat reveal">
+            <span class="beat-in">Registered factory</span>
+            <span class="beat-out">Normal · not theft</span>
+          </div>
+          <div class="beat reveal is-theft">
+            <span class="beat-in">Unregistered hook</span>
+            <span class="beat-out">Theft · 94% · 5/5 reasons</span>
+          </div>
+        </div>
+      </div>
+      <aside class="notes">This is the live console, and this is the demo — four beats.<br><br>Beat one: normal registered load. The energy balance holds. Verdict: normal.<br><br>Beat two: we raise the temperature. Measured loss rises — but the AI baseline rises with it, because that loss is explained by physics. Verdict: technical loss. No alarm. This is the false-positive killer.<br><br>Beat three: a registered industrial customer with a genuinely distorted waveform — high harmonic distortion. A threshold system would call this theft. Our harmonic CNN recognises a real factory. Verdict: normal.<br><br>Beat four: an unregistered hook on the network. Now the residual is unexplained, power factor collapses, harmonics match an illegal bypass, and the pattern is anomalous. The screen turns red: theft probability ninety-four percent, five out of five reasons met, roughly three kilowatts unaccounted for.<br><br>On six hundred held-out labelled scenarios, theft precision is one point zero — zero false positives — with F1 of zero point eight-eight, and zero percent false alarms on legitimate industrial load.<br><br>The beats replay in any order.</aside>
+    </section>
+
+    <!-- ===================== Slide 8 — Business Model ===================== -->
+    <section class="slide" data-i="7">
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 8 · Business Model</span>
+        <h2 class="h2" data-split>Recovered-Revenue Model</h2>
+        <p class="body reveal" style="margin-bottom: 3.5rem;">B2G: the distribution company pays a share of the energy we actually help recover — or a flat per-transformer subscription.</p>
+
+        <div class="roadmap-col reveal" style="max-width: 900px;">
+          <div class="roadmap-list">
+            <div class="roadmap-item">
+              <span class="roadmap-phase">Phase 1</span>
+              <span class="roadmap-desc"><strong style="color:var(--fg);">Pilot feeder — monitoring only, leads reported to inspectors</strong></span>
+            </div>
+            <div class="roadmap-item">
+              <span class="roadmap-phase">Phase 2</span>
+              <span class="roadmap-desc"><strong style="color:var(--fg);">Validation — confirmed cases and recovered energy measured in the field</strong></span>
+            </div>
+            <div class="roadmap-item">
+              <span class="roadmap-phase">Phase 3</span>
+              <span class="roadmap-desc"><strong style="color:var(--fg);">Rollout across the district's transformer kiosks</strong></span>
+            </div>
+            <div class="roadmap-item">
+              <span class="roadmap-phase">Phase 4</span>
+              <span class="roadmap-desc"><strong style="color:var(--fg);">Governorate-wide theft map + load-forecasting layer</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="notes">From a business perspective, this is a B2G play — distribution companies and the Ministry of Electricity.<br><br>We priced it so that adoption carries almost no risk: the client pays a percentage of the energy we actually help recover, or a flat monthly subscription per transformer.<br><br>The numbers work. Hardware is roughly three hundred dollars per kiosk, against tens of thousands of pounds leaking every month from a single feeder. Return on investment is under one month per kiosk.<br><br>The market: around thirty billion pounds a year of non-technical loss in Egypt. Recovering even ten percent is three billion pounds.<br><br>Our entry strategy is phased:<br><br>First, a pilot feeder in monitoring-only mode.<br>Then validation — confirmed cases and recovered energy, measured in the field.<br>Then rollout across the district's transformer kiosks.<br>And finally a governorate-wide theft map, with load forecasting on top.</aside>
+    </section>
+
+    <!-- ===================== Slide 9 — Impact ===================== -->
+    <section class="slide" data-i="8">
+      <div class="slide-inner">
+        <span class="eyebrow reveal">Slide 9 · Impact</span>
+        <h2 class="h2" data-split>Multi-dimensional Impact</h2>
+
+        <div class="results-layout" style="margin-top: 3.5rem;">
+          <div class="cred-section reveal">
+            <div class="cred-block why">
+              <h4>Economically</h4>
+              <ul>
+                <li>Recovered revenue from energy already generated and delivered</li>
+                <li>Inspection trips that pay for themselves — leads are ranked and trustworthy</li>
+              </ul>
+            </div>
+            <div class="cred-block why">
+              <h4>Operationally</h4>
+              <ul>
+                <li>Theft localized to the transformer, with a time stamp</li>
+                <li>Early warning on transformer overload</li>
+                <li>Fewer wasted field trips, less inspector fatigue</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="cred-section reveal">
+            <div class="cred-block why">
+              <h4>Socially</h4>
+              <ul>
+                <li>Less load-shedding caused by unbilled demand</li>
+                <li>Fairness for customers who pay their bills</li>
+              </ul>
+            </div>
+            <div class="cred-block why">
+              <h4>Infrastructure level</h4>
+              <ul>
+                <li>Generated energy that is currently wasted is put back on the books</li>
+                <li>A live, data-driven picture of the distribution network</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="notes">The impact of this project is multi-dimensional.<br><br>Economically: revenue recovered from energy that was already generated and already delivered — and inspection trips that pay for themselves, because the leads are ranked and trustworthy.<br><br>Operationally: theft localized to a specific transformer with a time stamp, early warning on transformer overload, and far fewer wasted field trips.<br><br>Socially: less load-shedding caused by unbilled demand — and fairness for the customers who do pay their bills.<br><br>At the infrastructure level: energy that is currently generated and wasted goes back on the books, and the operator finally gets a live, data-driven picture of the distribution network.<br><br>This puts the project directly on the path of smart grids and sustainable infrastructure.</aside>
+    </section>
+
+    <!-- ===================== Slide 10 — Closing ===================== -->
+    <section class="slide closing" data-i="9">
+      <div class="ambient" aria-hidden="true"></div>
+      <div class="illustration ill-closing" aria-hidden="true">
+        <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="g-close" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"  stop-color="#22e5ff" stop-opacity="0.25"/>
+              <stop offset="60%" stop-color="#0066ff" stop-opacity="0.08"/>
+              <stop offset="100%" stop-color="#0066ff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#g-close)"/>
+          <g class="rings" stroke="#0066ff" fill="none">
+            <circle cx="800" cy="450" r="180" stroke-opacity="0.4" stroke-width="2" stroke-dasharray="10 5"/>
+            <circle cx="800" cy="450" r="320" stroke-opacity="0.25" stroke-width="1.5"/>
+            <circle cx="800" cy="450" r="480" stroke-opacity="0.15" stroke-width="1" stroke-dasharray="20 10"/>
+            <circle cx="800" cy="450" r="650" stroke-opacity="0.08" stroke-width="1"/>
+          </g>
+          <g stroke="#22e5ff" stroke-width="2.5" fill="none" stroke-opacity="0.7">
+             <path class="signal" d="M 0 450 L 550 450 L 600 350 L 650 550 L 700 450 L 1600 450" />
+             <path class="signal" d="M 0 600 L 450 600 L 500 500 L 550 700 L 600 600 L 1600 600" stroke-opacity="0.3" stroke-width="1.5" />
+          </g>
+          <circle cx="800" cy="450" r="10" fill="#22e5ff" />
+        </svg>
+      </div>
+      <div class="slide-inner" style="text-align: center;">
+        <span class="eyebrow reveal" style="margin-bottom: 2.5rem;">Slide 10 · Closing</span>
+        <h2 class="h2 reveal" style="font-size: clamp(3.5rem, 7vw, 5.5rem);">Scalable Grid Intelligence Platform</h2>
+        <p class="body reveal" style="margin: 0 auto 3.5rem; max-width: 65ch; font-size: 1.35rem; color: var(--accent-2);">Distribution companies · Industrial zones · Smart-meter rollouts · Any metered network</p>
+
+        <p class="body reveal" style="margin: 0 auto; max-width: 60ch; color: var(--fg); font-weight: 500; font-size: 1.5rem;">Built to make the invisible loss visible — turning a blind distribution grid into one that can explain, in watts and in reasons, exactly where its energy goes.</p>
+      </div>
+      <aside class="notes">In conclusion...<br><br>Grid-Pulse NTL is not just a dashboard.<br><br>It is a scalable grid intelligence platform.<br><br>The same energy-balance and anomaly layer applies to distribution companies, industrial zones, smart-meter rollouts — any network where energy is delivered and metered.<br><br>Our goal is to make the invisible loss visible: to turn a blind distribution grid into one that can explain, in watts and in reasons, exactly where its energy goes.<br><br>Thank you.</aside>
+    </section>
+
+    <!-- ===================== Slide 11 — Thank You ===================== -->
+    <section class="slide" data-i="10" style="text-align: center;">
+      <div class="ambient" aria-hidden="true" style="opacity: 0.8;"></div>
+      <div class="illustration" aria-hidden="true">
+        <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(800 450)">
+            <circle cx="0" cy="0" r="120" stroke="#22e5ff" stroke-width="2" fill="none" stroke-opacity="0.4" stroke-dasharray="10 20">
+               <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="15s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="0" cy="0" r="240" stroke="#0066ff" stroke-width="2" fill="none" stroke-opacity="0.3" stroke-dasharray="2 10">
+               <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="25s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="0" cy="0" r="380" stroke="#22e5ff" stroke-width="1.5" fill="none" stroke-opacity="0.2">
+               <animate attributeName="r" values="380; 410; 380" dur="6s" repeatCount="indefinite" />
+               <animate attributeName="stroke-opacity" values="0.2; 0.4; 0.2" dur="6s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="0" cy="0" r="540" stroke="#0066ff" stroke-width="1" fill="none" stroke-opacity="0.1">
+               <animate attributeName="r" values="540; 580; 540" dur="10s" repeatCount="indefinite" />
+            </circle>
+
+            <!-- Radiating feeders -->
+            <g stroke="#22e5ff" stroke-width="1.5" stroke-opacity="0.15">
+              <line x1="0" y1="-150" x2="0" y2="-800"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="40s" repeatCount="indefinite"/></line>
+              <line x1="0" y1="150" x2="0" y2="800"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="40s" repeatCount="indefinite"/></line>
+              <line x1="-150" y1="0" x2="-800" y2="0"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="40s" repeatCount="indefinite"/></line>
+              <line x1="150" y1="0" x2="800" y2="0"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="40s" repeatCount="indefinite"/></line>
+            </g>
+          </g>
+          <!-- Floating sensor nodes -->
+          <g fill="#22e5ff">
+            <circle cx="300" cy="200" r="3" opacity="0.8">
+              <animate attributeName="cy" values="200; 150; 200" dur="4s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.8; 0.2; 0.8" dur="4s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="1200" cy="700" r="4" fill="#0066ff" opacity="0.6">
+              <animate attributeName="cy" values="700; 650; 700" dur="5s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.6; 0.1; 0.6" dur="5s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="1300" cy="300" r="2.5" opacity="0.7">
+              <animate attributeName="cx" values="1300; 1250; 1300" dur="6s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.7; 0.3; 0.7" dur="6s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="400" cy="600" r="5" fill="#0066ff" opacity="0.5">
+              <animate attributeName="cx" values="400; 450; 400" dur="7s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.5; 0; 0.5" dur="7s" repeatCount="indefinite"/>
+            </circle>
+          </g>
+        </svg>
+      </div>
+      <div class="slide-inner" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative; z-index: 2;">
+
+        <div class="reveal" style="position: relative; margin-bottom: 2rem;">
+          <h1 class="h1 reveal" style="font-size: clamp(6rem, 14vw, 13rem); background: linear-gradient(to right, #22e5ff, #0066ff, #22e5ff, #0066ff); background-size: 300% auto; -webkit-background-clip: text; background-clip: text; color: transparent; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; filter: drop-shadow(0 0 30px rgba(0,102,255,0.6)); animation: shine 6s linear infinite;">Thank You</h1>
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 140%; height: 140%; background: radial-gradient(circle, rgba(34,229,255,0.2) 0%, transparent 60%); z-index: -1; filter: blur(25px); pointer-events: none; animation: pulse-glow 3s ease-in-out infinite;"></div>
+        </div>
+
+        <div class="reveal" style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem;">
+          <p class="body" style="font-family: var(--mono); color: var(--fg); font-weight: 500; letter-spacing: 0.3em; font-size: 1.8rem; text-transform: uppercase; display: flex; align-items: center; gap: 1.5rem; text-shadow: 0 0 20px rgba(255,255,255,0.3);">
+            <span style="display: inline-block; width: 60px; height: 2px; background: linear-gradient(90deg, transparent, var(--accent-2));"></span>
+            Grid-Pulse NTL
+            <span style="display: inline-block; width: 60px; height: 2px; background: linear-gradient(-90deg, transparent, var(--accent-2));"></span>
+          </p>
+        </div>
+      </div>
+
+      <style>
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+          50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+        }
+        @keyframes shine {
+          to { background-position: 300% center; }
+        }
+      </style>
+    </section>
+
+  </main>
+
+  <!-- Speaker notes panel -->
+  <div class="notes-panel" id="notes-panel" aria-live="polite">
+    <div class="notes-label">Speaker Notes</div>
+    <div class="notes-text" id="notes-text"></div>
+  </div>
+  <div class="notes-hint" id="notes-hint">S — notes</div>
+
+  <nav class="dots" id="dots" aria-label="Slide navigation"></nav>
+  <button class="nav prev" id="prev" aria-label="Previous slide">‹</button>
+  <button class="nav next" id="next" aria-label="Next slide">›</button>
+  <div class="hint" id="hint">← →&nbsp;&nbsp;·&nbsp;&nbsp;Esc&nbsp;&nbsp;·&nbsp;&nbsp;S&nbsp;&nbsp;·&nbsp;&nbsp;F</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      gsap.defaults({ ease: 'power3.out', duration: 0.8 });
+
+      // ---------------------------------------------------------------
+      // DOM
+      // ---------------------------------------------------------------
+      const slides    = Array.from(document.querySelectorAll('.slide'));
+      const total     = slides.length;
+      const curEl     = document.getElementById('cur');
+      const totEl     = document.getElementById('tot');
+      const progressEl = document.getElementById('progress');
+      const dotsEl    = document.getElementById('dots');
+      const prevBtn   = document.getElementById('prev');
+      const nextBtn   = document.getElementById('next');
+      const hint      = document.getElementById('hint');
+      const notesPanel = document.getElementById('notes-panel');
+      const notesText  = document.getElementById('notes-text');
+      const notesHint  = document.getElementById('notes-hint');
+
+      totEl.textContent = String(total).padStart(2, '0');
+
+      // ---------------------------------------------------------------
+      // Dots
+      // ---------------------------------------------------------------
+      const dots = slides.map((_, i) => {
+        const d = document.createElement('button');
+        d.className = 'dot';
+        d.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+        d.addEventListener('click', () => goTo(i));
+        dotsEl.appendChild(d);
+        return d;
+      });
+
+      // ---------------------------------------------------------------
+      // Word-split
+      // ---------------------------------------------------------------
+      function splitWords(el) {
+        const text  = el.textContent.trim();
+        const words = text.split(/\s+/);
+        el.textContent = '';
+        const inners = [];
+        words.forEach((w, i) => {
+          const wrap  = document.createElement('span');
+          wrap.className = 'word';
+          const inner = document.createElement('span');
+          inner.className = 'inner';
+          inner.textContent = w;
+          wrap.appendChild(inner);
+          el.appendChild(wrap);
+          inners.push(inner);
+          if (i < words.length - 1) el.appendChild(document.createTextNode(' '));
+        });
+        return inners;
+      }
+      document.querySelectorAll('[data-split]').forEach((el) => {
+        el._inners = splitWords(el);
+      });
+
+      // ---------------------------------------------------------------
+      // Counters
+      // ---------------------------------------------------------------
+      const formatters = {
+        int:         (v) => Math.round(v).toString(),
+        oneDecimal:  (v) => v.toFixed(1),
+        twoDecimal:  (v) => v.toFixed(2),
+        threeDecimal:(v) => v.toFixed(3),
+        fourDecimal: (v) => v.toFixed(4),
+      };
+      function runCounters(slide) {
+        slide.querySelectorAll('[data-count]').forEach((el) => {
+          const target = parseFloat(el.dataset.count);
+          const fmt    = formatters[el.dataset.format] || formatters.int;
+          if (prefersReduced) { el.textContent = fmt(target); return; }
+          const obj = { v: 0 };
+          gsap.to(obj, {
+            v: target, duration: 1.2, ease: 'power3.out',
+            onUpdate: () => { el.textContent = fmt(obj.v); }
+          });
+        });
+      }
+
+      // ---------------------------------------------------------------
+      // Per-slide entry animation
+      // ---------------------------------------------------------------
+      function playSlide(idx) {
+        const slide   = slides[idx];
+        const splits  = slide.querySelectorAll('[data-split]');
+        const reveals = slide.querySelectorAll('.reveal');
+
+        splits.forEach((el) => gsap.set(el._inners, { y: '110%' }));
+        gsap.set(reveals, { opacity: 0, y: 24 });
+
+        const tl = gsap.timeline({ delay: 0.15 });
+        splits.forEach((el, i) => {
+          tl.to(el._inners, { y: '0%', duration: 0.9, stagger: 0.045 }, i * 0.05);
+        });
+        if (reveals.length) {
+          tl.to(reveals, { opacity: 1, y: 0, duration: 0.7, stagger: 0.06 }, splits.length ? 0.25 : 0);
+        }
+        if (slide.querySelector('[data-count]')) {
+          tl.add(() => runCounters(slide), splits.length ? 0.3 : 0.1);
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // Speaker notes
+      // ---------------------------------------------------------------
+      let notesOpen = false;
+
+      function updateNotes(idx) {
+        const aside = slides[idx].querySelector('aside.notes');
+        notesText.innerHTML = aside ? aside.innerHTML.trim() : '';
+      }
+
+      function toggleNotes() {
+        notesOpen = !notesOpen;
+        notesPanel.classList.toggle('is-open', notesOpen);
+        notesHint.textContent = notesOpen ? 'S — close notes' : 'S — notes';
+      }
+
+      // ---------------------------------------------------------------
+      // Navigation
+      // ---------------------------------------------------------------
+      let current = 0;
+      let busy    = false;
+
+      function updateChrome(idx) {
+        curEl.textContent = String(idx + 1).padStart(2, '0');
+        progressEl.style.width = ((idx + 1) / total * 100) + '%';
+        dots.forEach((d, i) => d.classList.toggle('is-active', i === idx));
+        prevBtn.disabled = idx === 0;
+        nextBtn.disabled = idx === total - 1;
+        const h = '#' + (idx + 1);
+        if (location.hash !== h) history.replaceState(null, '', h);
+      }
+
+      function goTo(idx, instant) {
+        if (busy || idx === current || idx < 0 || idx >= total) return;
+        if (document.body.classList.contains('is-overview')) toggleOverview();
+        busy = true;
+
+        const out = slides[current];
+        const inn = slides[idx];
+
+        updateNotes(idx);
+
+        if (instant || prefersReduced) {
+          out.classList.remove('is-active');
+          inn.classList.add('is-active');
+          gsap.set(out, { opacity: 0, y: 0, filter: 'none' });
+          gsap.set(inn, { opacity: 1, y: 0, filter: 'none' });
+          current = idx;
+          updateChrome(idx);
+          playSlide(idx);
+          busy = false;
+          return;
+        }
+
+        gsap.to(out, {
+          opacity: 0, y: -24, filter: 'blur(12px)',
+          duration: 0.5, ease: 'power3.in',
+          onComplete: () => { out.classList.remove('is-active'); }
+        });
+
+        gsap.set(inn, { opacity: 0, y: 32, filter: 'blur(8px)' });
+        inn.classList.add('is-active');
+        gsap.to(inn, {
+          opacity: 1, y: 0, filter: 'blur(0px)',
+          duration: 0.7, delay: 0.15, ease: 'power3.out',
+          onStart:    () => playSlide(idx),
+          onComplete: () => { busy = false; }
+        });
+
+        current = idx;
+        updateChrome(idx);
+      }
+
+      function next() { goTo(current + 1); }
+      function prev() { goTo(current - 1); }
+
+      prevBtn.addEventListener('click', prev);
+      nextBtn.addEventListener('click', next);
+
+      // ---------------------------------------------------------------
+      // Keyboard
+      // ---------------------------------------------------------------
+      let hintFaded = false;
+      function fadeHint() {
+        if (hintFaded) return;
+        hintFaded = true;
+        hint.classList.add('is-faded');
+      }
+
+      window.addEventListener('keydown', (e) => {
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+        switch (e.key) {
+          case 'ArrowRight':
+          case ' ':
+          case 'PageDown':
+          case 'n':
+            e.preventDefault(); fadeHint(); next(); break;
+          case 'ArrowLeft':
+          case 'PageUp':
+          case 'p':
+            e.preventDefault(); fadeHint(); prev(); break;
+          case 'Home':
+            e.preventDefault(); fadeHint(); goTo(0); break;
+          case 'End':
+            e.preventDefault(); fadeHint(); goTo(total - 1); break;
+          case 'Escape':
+            e.preventDefault(); fadeHint(); toggleOverview(); break;
+          case 's':
+          case 'S':
+            e.preventDefault(); toggleNotes(); break;
+          case 'f':
+          case 'F':
+            e.preventDefault(); fadeHint(); toggleFullscreen(); break;
+        }
+      });
+
+      // ---------------------------------------------------------------
+      // Touch
+      // ---------------------------------------------------------------
+      let tStart = null;
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) tStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }, { passive: true });
+      window.addEventListener('touchend', (e) => {
+        if (!tStart) return;
+        const t  = e.changedTouches[0];
+        const dx = t.clientX - tStart.x;
+        const dy = t.clientY - tStart.y;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+          fadeHint();
+          dx < 0 ? next() : prev();
+        }
+        tStart = null;
+      }, { passive: true });
+
+      // ---------------------------------------------------------------
+      // Fullscreen
+      // ---------------------------------------------------------------
+      function toggleFullscreen() {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // Overview
+      // ---------------------------------------------------------------
+      function computeOverviewScale() {
+        const w    = window.innerWidth;
+        const cols = w > 900 ? 3 : (w > 600 ? 2 : 1);
+        const pad  = 32 * 2;
+        const gap  = 20 * (cols - 1);
+        const colWidth = (w - pad - gap) / cols;
+        const scale    = colWidth / 1600;
+        document.documentElement.style.setProperty('--ov-scale', scale.toString());
+      }
+      function toggleOverview() {
+        const on = !document.body.classList.contains('is-overview');
+        document.body.classList.toggle('is-overview', on);
+        if (on) {
+          computeOverviewScale();
+          window.addEventListener('resize', computeOverviewScale);
+          slides.forEach((s, i) => {
+            s._ovHandler = () => goTo(i);
+            s.addEventListener('click', s._ovHandler);
+          });
+        } else {
+          window.removeEventListener('resize', computeOverviewScale);
+          slides.forEach((s) => {
+            if (s._ovHandler) s.removeEventListener('click', s._ovHandler);
+          });
+        }
+      }
+
+      // ---------------------------------------------------------------
+      // Init
+      // ---------------------------------------------------------------
+      const hashIdx = parseInt(location.hash.replace('#', ''), 10) - 1;
+      if (!isNaN(hashIdx) && hashIdx >= 0 && hashIdx < total) {
+        current = hashIdx;
+      }
+
+      updateChrome(current);
+      slides.forEach((s, i) => {
+        if (i === current) {
+          s.classList.add('is-active');
+          gsap.set(s, { opacity: 1, y: 0 });
+          playSlide(i);
+        } else {
+          s.classList.remove('is-active');
+          gsap.set(s, { opacity: 0 });
+        }
+      });
+      updateNotes(current);
+
+    })();
+  </script>
+</body>
+</html>
